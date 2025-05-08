@@ -1,0 +1,245 @@
+body {
+    font-family:Arial, Helvetica, sans-serif;
+}
+.main {
+    background-color: rgb(230, 230, 230);
+    margin-left: 10em;
+    margin-right: 10em;
+}
+table.controls {
+    margin: 5% auto;
+    border-collapse: collapse;
+    width: 35%;
+}
+table.radiators-list {
+    margin: 3% auto;
+    border-collapse: collapse;
+    width: 50%;
+    min-width: 40%;
+    background-color: white;
+}
+table.controls td {
+    padding: 0;
+}
+table.controls th {
+    height: 50px;
+    padding: 0;
+}
+table.radiators-list th {
+    text-align: right;
+    padding:0;
+    height: 30px;
+    border-bottom: 2px solid #B0B0B0;
+}
+table.radiators-list td {
+    background-color: #D0D0D0;
+    height: 50px;
+    padding: 0;
+    border-left: 2px solid #B0B0B0;
+    text-align: left;
+    padding-right: 2px;
+    padding-left: 8px;
+    border-bottom: 5px solid rgb(230, 230, 230);
+    border-top: 5px solid rgb(230, 230, 230);
+}
+
+table.radiators-list td:last-child {
+    text-align: center; /* align buttons to the right */
+}
+table.radiators-list td:first-child {
+    border-left: 0;
+    min-width: 20%;
+}
+table.radiators-list th > button#add {
+    cursor: pointer;
+    width: 100%;
+    height: 50px;
+    background-color: #009bd6;
+    color: white;
+    border: 1px solid #00719c;
+    font-size: 16px;
+}
+table.radiators-list th > input#searchQuery {
+    display: block;
+    min-height: 50px;
+    width: 100%;
+    height: 100%;
+    text-align: left;
+    padding-left: 2px;
+    box-sizing: border-box;
+}
+table.radiators-list th > button#add:hover {
+    background-color: #00719c;
+}
+button#increase, button#decrease {
+    padding: 20px;
+    font-size: 16px;
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+    background-color: #B0B0B0;
+    color: white;
+    border: 1px solid #989898
+}
+button#increase:hover, button#decrease:hover{
+    background-color: #989898;
+}
+button#submit {
+    padding: 20px;
+    font-size: 16px;
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+    background-color: #009bd6;
+    color: white;
+    border: 1px solid #989898
+}
+button#submit:hover{
+    background-color: #00719c;
+}
+input[type="text"] {
+    width: 100%;
+    height: 100%;
+    font-size: 25px;
+    text-align: center;
+    box-sizing: border-box;
+}
+caption#table-title {
+    padding-bottom: 5px;
+    font-size: 20px;
+    font-weight: bold;
+    text-align: center;
+}
+caption#radiators-title {
+    padding-bottom: 5px;
+    font-size: 20px;
+    font-weight: bold;
+    text-align: center;
+}
+table.radiators-list td > button {
+    margin: 0 4px;
+    padding: 8px 10px;
+    background-color: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 18px;
+    color: #333;
+}
+
+table.radiators-list button:hover {
+    color: #00719c;
+}
+#column-names th {
+    background-color: #D0D0D0;
+    text-align: center;
+    border-left: 2px solid #B0B0B0;
+    border-right: 2px solid #B0B0B0 ;
+}
+#column-names th:first-child {
+    border-left: 0;
+}
+#column-names th:last-child {
+    border-right: 0;
+}
+table.radiators-list td.mac-cell {
+    width: 30%; /* Adjust this percentage as needed to make it the largest */
+}
+table.radiators-list td.temp-cell {
+    width: 10%; /* Adjust this percentage as needed to make it the largest */
+    min-width: 7%;
+    text-align: left;
+}
+table.radiators-list td.name-cell {
+    min-width: 83px;
+}
+.sync-button {
+    text-align: center;
+}
+.sync-button button#sync-button {
+    color: black;
+    background-color: white;
+    border: 2px solid #B0B0B0;
+    height: 50px;
+    width: 35%;
+    font-size: 30px;
+    cursor:pointer;
+    min-width: 200px;
+}
+.sync-button button#sync-button:hover {
+    background-color: rgb(219, 219, 219);
+}
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgb(0,0,0);
+    background-color: rgba(0,0,0,0.4);
+}
+.modal-content {
+    background-color: #fefefe;
+    margin: 15% auto;
+    border: 1px solid #888;
+    width: 30%;
+    padding: 20px;
+}
+.close {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+}
+.close:hover,
+.close:focus {
+    color: black;
+    text-decoration: none;
+    cursor: pointer;
+}
+#modal-add {
+    cursor: pointer;
+    height: 60px;
+    background-color: #009bd6;
+    color: white;
+    border: 1px solid #00719c;
+    font-size: 16px;
+}
+#modal-add:hover{
+    background-color: #00719c;
+}
+#modal-close {
+    font-size: 16px;
+    height: 60px;
+    cursor: pointer;
+    background-color: #B0B0B0;
+    color: white;
+    border: 1px solid #989898
+}
+#modal-close:hover {
+    background-color: #989898;
+}
+.modal-buttons {
+    display: flex;
+    justify-content: space-between; /* space between buttons */
+    margin: 30px -20px -20px -20px;
+}
+
+.modal-buttons button {
+    width: 50%; /* or use fixed width if you prefer */
+}
+.modal-inputs input {
+    margin-bottom: 20px;
+}
+#input-title {
+    color: #888;
+}
+#newTemperature {
+    width: 100%;
+    height: 100%;
+    font-size: 25px;
+    text-align: center;
+    box-sizing: border-box;
+}
