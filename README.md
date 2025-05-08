@@ -42,3 +42,7 @@ The IP address to access the server is being printed to serial port.
 
 #### Manual Control
 Rotate the rotary encoder to adjust the desired temperature for the selected radiator. The OLED display will show the current temperature and the selected radiator. Use the button to switch between different radiators.
+
+# Contributors
+- Ričards Bubišs
+- Markuss Birznieks
