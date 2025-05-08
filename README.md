@@ -1,4 +1,4 @@
-# Smart Radiator Thermostat Regulation
+# Smart Radiator Thermostat
 
 ## Description
 This project implements a smart radiator temperature control system. The system allows manual temperature adjustment via a rotary encoder, as well as remote control through a web interface. It uses ESP32 and ESP32-C3 modules, a 28BYJ-48 5V stepper motor for precise temperature regulation, an OLED display (SSD1306), and a DHT11 sensor for measuring ambient temperature. A press button is used to switch between different radiators in the system.
