@@ -12,6 +12,11 @@ Real-Time Temperature Monitoring: Displays current temperature readings from the
 Precise Valve Control: Uses a stepper motor to adjust radiator valves according to the set temperature.
 LIVE thermostat updates when sending new requests, showing status via display.
 
+## Architecture
+![Communication diagram](Images/project_communication.drawio.png)
+
+ESP32 and ESP8266 communicate using UART (Serial bus). ESP8266 holds Web server, ESP32 gets data from Web and sends using ESP-NOW to ESP32C3 radiator nodes.
+
 
 ## Setup
 
