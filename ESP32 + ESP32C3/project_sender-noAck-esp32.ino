@@ -1,4 +1,3 @@
-#include <ESPAsyncWebServer.h>
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
@@ -6,9 +5,7 @@
 #include <DHT_U.h>
 #include <WiFi.h>
 #include <esp_now.h>
-
-#include <LittleFS.h>
-#include <AsyncTCP.h>
+#include <ArduinoJson.h>
 
 #define DEBUG FALSE // CHANGE TO TRUE TO ENABLE SERIAL OUTPUTS 
 
@@ -20,6 +17,9 @@
 #define DHT_PIN 13 // D13
 #define DHT_TYPE DHT11 
 #define BUTTON_PIN 12 // D12
+
+#define RX2 16
+#define TX2 17
 
 #define SDA_PIN 21  // Define SDA pin (GPIO 21)
 #define SCL_PIN 22  // Define SCL pin (GPIO 22)
@@ -33,20 +33,10 @@
 
 #define DEFAULT_TEMP 20
 
-const char *ssid = "LMT-F3DD";
-const char *password = "QN5QQTY6J16";
-
 uint8_t commonTemp = DEFAULT_TEMP;
 bool tempChanged = false;
 
-AsyncWebServer server(80);
-
 String PARAM_MESSAGE = "temperature";
-
-void notFound(AsyncWebServerRequest *request)
-{
-  request->send(404, "text/plain", "Not found");
-}
 
 const unsigned char check_icon [] PROGMEM = {
   0b00000000,
@@ -89,7 +79,7 @@ typedef struct struct_message {
 
 typedef struct { 
   uint8_t mac[6];
-  String name;
+  char name[16];
   uint8_t curr_temp; // hold current temp for each radiator
   bool ackReceived; 
 } Radiator;
@@ -164,6 +154,8 @@ void OnDataSent(const unsigned char *mac_addr, esp_now_send_status_t sendStatus)
 
 void setup() {
   Serial.begin(115200);
+  Serial2.begin(9600, SERIAL_8N1, RX2, TX2);
+
   Wire.begin(SDA_PIN, SCL_PIN);
 
   pinMode(ENCODER_CLK, INPUT);
@@ -185,17 +177,8 @@ void setup() {
   
   // Initialize Wi-Fi for ESP-NOW
   WiFi.mode(WIFI_STA);
-  //WiFi.disconnect(); // Ensure Wi-Fi is off
+  WiFi.disconnect(); // Ensure Wi-Fi is off
   //WiFi.channel(ESPNOW_CHANNEL);
-  WiFi.begin(ssid, password);
-  if (WiFi.waitForConnectResult() != WL_CONNECTED)
-  {
-    Serial.printf("WiFi Failed!\n");
-    return;
-  }
-
-  Serial.print("IP Address: ");
-  Serial.println(WiFi.localIP());
   
   // Initialize ESP-NOW
   if (esp_now_init() != 0) {
@@ -217,51 +200,6 @@ void setup() {
   
   esp_now_add_peer(&peerInfo);
 }
-//Start web and handle
-Serial.println("Starting the LittleFS Webserver..");
-    // Begin LittleFS
-  if (!LittleFS.begin())
-  {
-    Serial.println("An Error has occurred while mounting LittleFS");
-    return;
-  }
-  // Route for root index.html
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
-            { request->send(LittleFS, "/index.html", "text/html"); });
-
-  // Route for root index.css
-  server.on("/styles.css", HTTP_GET, [](AsyncWebServerRequest *request)
-            { request->send(LittleFS, "/styles.css", "text/css"); });
-
-  // Route for root index.js
-  server.on("/script.js", HTTP_GET, [](AsyncWebServerRequest *request)
-            { request->send(LittleFS, "/script.js", "text/javascript"); });
-
-  server.on("/edit.svg", HTTP_GET, [](AsyncWebServerRequest *request) {
-      request->send(LittleFS, "/edit.svg", "image/svg+xml");  });
-
-  server.on("/delete.svg", HTTP_GET, [](AsyncWebServerRequest *request) {
-      request->send(LittleFS, "/delete.svg", "image/svg+xml");  });
-
-  // Respond to toggle event
-  server.on("/set", HTTP_GET, [](AsyncWebServerRequest *request)
-            {
-        String temperature;
-        if (request->hasParam(PARAM_MESSAGE)) {
-            temperature = request->getParam(PARAM_MESSAGE)->value();
-            Serial.print("Received temperature: ");
-             Serial.println(temperature);
-            if(temperature.length() > 0){
-              setTemperature(temperature);
-            }
-        } else {
-            temperature = "No message sent";
-        }
-        request->send(200, "text/plain", "Received temperature : " + temperature); });
-
-  server.onNotFound(notFound);
-
-  server.begin();
 }
 
 // bool waitForAck(Radiator &targetRadiator, unsigned long timeoutMs = 1000, uint8_t maxRetries = 3){
@@ -288,7 +226,7 @@ Serial.println("Starting the LittleFS Webserver..");
 //   return false;
 // }
 
-void setTemperature(String temperature){
+void setALLTemperature(String temperature){
   int temp = temperature.toInt();
 
   // Check if the temperature is within the valid range
@@ -303,9 +241,39 @@ void setTemperature(String temperature){
   return;
 }
 
+void sendRadiatorsToWeb(){
+  StaticJsonDocument<768> doc;
+  JsonArray arr = doc.to<JsonArray>();
+
+  for (int i = 0; i < numRadiators; i++) {
+    JsonObject obj = arr.createNestedObject();
+
+    char macStr[18];
+    //make desired mac string using sprintf
+    sprintf(macStr, "%02X:%02X:%02X:%02X:%02X:%02X",
+            radiators[i].mac[0], radiators[i].mac[1], radiators[i].mac[2],
+            radiators[i].mac[3], radiators[i].mac[4], radiators[i].mac[5]);
+    
+    obj["mac"] = macStr;
+    obj["name"] = radiators[i].name;
+    obj["curr_temp"] = radiators[i].curr_temp;
+    obj["ack"] = radiators[i].ackReceived;
+  }
+
+  Serial.println("Sending radiators JSON");
+  serializeJson(doc, Serial2);  // Or to SoftwareSerial
+  Serial2.println(); // newline to indicate end
+}
+
+//process received json and update the radiators struct array
+void processJSON(String jsonStr){
+
+}
+
 static uint8_t lastSentTemperature = 0;
 static unsigned long lastSendTime = 0;
-const uint16_t sendInterval = 30000; // 30 seconds delay
+static unsigned long lastWebSendTime = 0;
+const uint16_t sendInterval = 10000; // 10 seconds delay
 
 int lastEncoderButtonState = HIGH;
 int lastEncoderState = HIGH;
@@ -314,6 +282,25 @@ int encoderClicked = false;
 bool buttonClicked = false;
 
 void loop() {
+
+//constantly reading Serial2 waiting for some info
+  while (Serial2.available()) {
+    String incoming = Serial2.readStringUntil('\n');
+    Serial.print("Received from WEB: ");
+    Serial.println(incoming);
+
+    // Check if it starts with "ALL/T"
+    if (incoming.startsWith("ALL/T")) {
+    String tempStr = incoming.substring(5); // Extract "23" from "ALL/T23"
+    setALLTemperature(tempStr);
+    }
+  }
+
+// send some info to webserver every time n period
+  if((millis() - lastWebSendTime) > sendInterval){
+    sendRadiatorsToWeb();
+    lastWebSendTime = millis();
+  }
 
   button_state = digitalRead(BUTTON_PIN);
 
