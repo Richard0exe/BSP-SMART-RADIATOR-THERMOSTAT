@@ -41,6 +41,8 @@ For uploading WEB files use LittleFS:
 
 ARDUINO IDE -> (CMD + SHIFT + P) -> UPLOAD LittleFS to...
 
+---
+
 ## Wiring
 ### Main module
 
@@ -49,6 +51,8 @@ ARDUINO IDE -> (CMD + SHIFT + P) -> UPLOAD LittleFS to...
 ### Radiator module
 
 ![Radiator diagram](Images/radiator-module.drawio.png)
+
+---
 
 #### Web Interface
 Once the system is up and running, connect your device to the same network as the ESP32. Access the web interface by entering the ESP32's IP address in a web browser. Use the interface to adjust the radiator temperatures remotely.
