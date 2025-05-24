@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+    <head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="styles.css">
+    </head>
+    <body class="main">
+        <h1 style="text-align: center;">Smart Radiator Thermostat Control App</h1>
+
+        <table class="controls">
+            <caption id="table-title">Controls</caption>
+            <tr>
+                <th colspan="2"> <input onchange="setTemperatureFromInput()" min="8" max="28" type="text" inputmode="numeric" id="temp"></span></th>
+            </tr>
+            <tr>
+                <td><button id="decrease" onclick="decreaseTemp()">Decrease</button></td>
+                <td><button id="increase" onclick="increaseTemp()">Increase</button></td>
+            </tr>
+            <tr>
+                <td colspan="2"><button id="submit" onclick="sendTemperature()">Set Temperature</button></td>
+            </tr>
+        </table>
+        <table class="radiators-list">
+            <caption id="radiators-title">Radiators List</caption>
+            <tr>
+                <th colspan="3"><input id="searchQuery" oninput="onSearch()" type="text" placeholder="Search radiator by name"/></th>
+                <th colspan="1"><button onclick="addRadiator()" id="add">Add</button></th>
+            </tr>
+            <tr id="column-names">
+                <th>Name</th>
+                <th>MAC</th>
+                <th>Temp</th>
+                <th>Actions</th>
+            </tr>
+        </table>
+        <div class="sync-button">
+            <button id="sync-button" onclick="synchronize()">Synchronize</button>
+        </div>
+
+        <div id="addModal" class="modal">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <h2>Add New Radiator</h2>
+                <div class="modal-inputs">
+                <p id="input-title">Name</p>
+                <input type="text" id="newRadiatorName" placeholder="Enter radiator name">
+                <p id="input-title">MAC</p>
+                <input type="text" id="newMac" placeholder="Enter radiator MAC address">
+                <p id="input-title">Temperature</p>
+                <input type="number" min="8" max="28" id="newTemperature" placeholder="Enter temperature">
+                </div>
+                <div class="modal-buttons">
+                <button id="modal-close" onclick="closeModal()">Close</button>
+                <button id="modal-add" onclick="submitNewRadiator()">Add</button>
+            </div>
+            </div>
+        </div>
+        <script src="script.js"></script>
+    </body>
+</html>

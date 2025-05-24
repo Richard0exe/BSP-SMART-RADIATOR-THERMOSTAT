@@ -53,6 +53,7 @@ void setup() {
     return;
   }
 
+  Serial.println();
   Serial.print("IP Address: ");
   Serial.println(WiFi.localIP());
 
@@ -61,6 +62,14 @@ void setup() {
     Serial.println("An Error has occurred while mounting LittleFS");
     return;
   }
+
+  Dir dir = LittleFS.openDir("/");
+  Serial.println("Files:");
+  while (dir.next()) {
+    Serial.print("File: ");
+    Serial.println(dir.fileName());
+  }
+  Serial.println("All files listed");
 
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send(LittleFS, "/index.html", "text/html");
