@@ -10,8 +10,10 @@
 #define MAX_PEERS 10
 #define MAX_NAME_LEN 32
 #define DISCOVERY_MSG_TYPE 0
+#define MESSAGE_MAGIC 0x42A7
 
 typedef struct {
+  uint16_t magic;
   uint8_t type; // 0 = discovery, user-defined types > 0
   uint8_t length; // length of the payload
 } MessageHeader;

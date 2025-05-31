@@ -55,7 +55,7 @@ esp_err_t Communications::send(const uint8_t* addr, uint8_t type, const uint8_t*
   }
 
   uint8_t buffer[250]; // 2 bytes for header + up to 248 bytes of payload
-  MessageHeader header = { type, length };
+  MessageHeader header = { MESSAGE_MAGIC, type, length };
 
   memcpy(buffer, &header, sizeof(header));
   memcpy(buffer + sizeof(header), payload, length);
@@ -112,6 +112,11 @@ void Communications::onDataRecv(const esp_now_recv_info_t* recvInfo, const uint8
   }
 
   const MessageHeader* header = (const MessageHeader*)data;
+
+  if (header->magic != MESSAGE_MAGIC) {
+    Serial.println("Invalid message magic");
+    return;
+  }
 
   if (len != sizeof(MessageHeader) + header->length) {
     Serial.printf("Payload length mismatch: expected %d, got %d\n", header->length, len - sizeof(MessageHeader));
