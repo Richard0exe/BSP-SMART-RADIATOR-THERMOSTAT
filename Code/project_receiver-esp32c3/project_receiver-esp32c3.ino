@@ -1,7 +1,6 @@
-#include <WiFi.h>
-#include "esp_wifi.h"
-#include <esp_now.h>
 #include <AccelStepper.h>
+#include "Communications.h"
+#include "Messages.h"
 
 #define DEBUG FALSE // CHANGE TO TRUE TO ENABLE SERIAL OUTPUTS 
 #define ESPNOW_CHANNEL 6
@@ -16,63 +15,47 @@ const int stepsPerRevolution = STEPS_PER_REVOLUTION; // For 28BYJ-48 motor
 
 AccelStepper stepper(AccelStepper::HALF4WIRE, IN1, IN3, IN2, IN4);
 
-// Structure to receive data (temperature)
-typedef struct struct_message {
-  uint8_t msgType;
-  uint16_t msgId;
-  uint8_t temp;  // Temperature value received
-} struct_message;
-
-struct_message myData;
-
-enum MessageType {
-  DATA = 0,
-  ACK = 1
-  };
-MessageType messageType;
+Communications coms;
 
 // Callback function that wilal be executed when data is received
-void OnDataRecv(const esp_now_recv_info_t *recvInfo, const uint8_t *incomingData, int len) {
-  memcpy(&myData, incomingData, sizeof(myData));
-  Serial.print("Bytes received: ");
-  Serial.println(len);
+void OnDataRecv(const uint8_t* mac, uint8_t type, const uint8_t* data, int len) {
+  switch (type) {
+    case MSG_TYPE_TEMPERATURE:
+      if (len == sizeof(TemperaturePayload)) {
+        TemperaturePayload payload;
+        memcpy(&payload, data, sizeof(payload));
+        ProcessTemperaturePayload(mac, payload);
+      }
+      break;
 
-  //   // Add peer dynamically
-  // esp_now_peer_info_t peerInfo = {};
-  // memcpy(peerInfo.peer_addr, recvInfo->src_addr, 6);
-  // peerInfo.channel = ESPNOW_CHANNEL;
-  // peerInfo.encrypt = false;
-
-  // if (!esp_now_is_peer_exist(recvInfo->src_addr)) {
-  //   if (esp_now_add_peer(&peerInfo) == ESP_OK) {
-  //     Serial.println("New peer added successfully.");
-  //   } else {
-  //     Serial.println("Failed to add new peer.");
-  //   }
-  // }
-
-  if (myData.msgType == DATA) {
-    Serial.println("Message type: DATA");
-    //sendAck((uint8_t*)recvInfo->src_addr, myData.msgId); // send back ACK
-    Serial.print("Received Temperature: ");
-    Serial.println(myData.temp);
-
-    int segment = 0;
-    if (myData.temp <= 8) segment = 0;
-    else if (myData.temp <= 10) segment = 1;
-    else if (myData.temp <= 13) segment = 2;
-    else if (myData.temp <= 17) segment = 3;
-    else if (myData.temp <= 20) segment = 4;
-    else if (myData.temp <= 24) segment = 5;
-    else segment = 6;
-
-    int targetStep = map(segment, 0, 6, 0, stepsPerRevolution);
-    stepper.moveTo(2 * targetStep);
-    Serial.print("Moving to step: ");
-    Serial.println(targetStep);
-  } else {
-    Serial.println("Unknown type");
+    default:
+      Serial.println("Unknown message type");
+      break;
   }
+}
+
+void ProcessTemperaturePayload(const uint8_t* mac, const TemperaturePayload& payload) {
+  Serial.printf("Received Temperature from %s: %d\n", Communications::macToString(mac).c_str(), payload.temperature);
+
+  // needs some sort of verification that this message is from server
+  // this can be done by checking discovered peers and taking the one with the name "server"
+  // check communications.ino for how to get peers mac and name
+
+  int segment = 0;
+  if (payload.temperature <= 8) segment = 0;
+  else if (payload.temperature <= 10) segment = 1;
+  else if (payload.temperature <= 13) segment = 2;
+  else if (payload.temperature <= 17) segment = 3;
+  else if (payload.temperature <= 20) segment = 4;
+  else if (payload.temperature <= 24) segment = 5;
+  else segment = 6;
+
+  int targetStep = map(segment, 0, 6, 0, stepsPerRevolution);
+  stepper.moveTo(2 * targetStep);
+  Serial.print("Moving to step: ");
+  Serial.println(targetStep);
+
+  // send ack
 }
 
 // void sendAck(uint8_t *mac, uint16_t msgId) {
@@ -94,20 +77,14 @@ void setup() {
   // Initialize Serial Monitor
   Serial.println("Booting...");
   Serial.begin(115200);
-  
-  // Set device as a Wi-Fi Station
-  WiFi.mode(WIFI_STA);
-  WiFi.disconnect();
-  //WiFi.channel(ESPNOW_CHANNEL);
 
-  // Init ESP-NOW
-  if (esp_now_init() != 0) {
-    Serial.println("Error initializing ESP-NOW");
-    return;
-  }
+  coms.begin();
+  coms.setName("radiator");
   
   // Register to receive the data
-  esp_now_register_recv_cb(OnDataRecv);
+  coms.setReceiveHandler(OnDataRecv);
+
+  coms.broadcastDiscovery();
 
   // Setup the stepper motor
   stepper.setMaxSpeed(1000);
