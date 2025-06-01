@@ -20,11 +20,11 @@ Communications coms;
 // Callback function that wilal be executed when data is received
 void OnDataRecv(const uint8_t* mac, uint8_t type, const uint8_t* data, int len) {
   switch (type) {
-    case MSG_TYPE_TEMPERATURE:
-      if (len == sizeof(TemperaturePayload)) {
-        TemperaturePayload payload;
+    case MSG_TYPE_TEMPERATURE_COMMAND:
+      if (len == sizeof(TemperatureCommand)) {
+        TemperatureCommand payload;
         memcpy(&payload, data, sizeof(payload));
-        ProcessTemperaturePayload(mac, payload);
+        ProcessTemperatureCommand(mac, payload);
       }
       break;
 
@@ -34,12 +34,13 @@ void OnDataRecv(const uint8_t* mac, uint8_t type, const uint8_t* data, int len) 
   }
 }
 
-void ProcessTemperaturePayload(const uint8_t* mac, const TemperaturePayload& payload) {
+void ProcessTemperatureCommand(const uint8_t* mac, const TemperatureCommand& payload) {
   Serial.printf("Received Temperature from %s: %d\n", Communications::macToString(mac).c_str(), payload.temperature);
 
-  // needs some sort of verification that this message is from server
-  // this can be done by checking discovered peers and taking the one with the name "server"
-  // check communications.ino for how to get peers mac and name
+  if (!isServerMac(mac)) {
+    Serial.printf("Unauthorized MAC %s tried to change temperature!\n", Communications::macToString(mac).c_str());
+    return;
+  }
 
   int segment = 0;
   if (payload.temperature <= 8) segment = 0;
@@ -56,6 +57,26 @@ void ProcessTemperaturePayload(const uint8_t* mac, const TemperaturePayload& pay
   Serial.println(targetStep);
 
   // send ack
+  sendAckTemperatureResponse(mac, payload, true);
+}
+
+bool isServerMac(const uint8_t mac[6]) {
+  const Peer* server = coms.getPeerByName("server");
+  if (!server) return false;
+  return memcmp(mac, server->mac, 6) == 0;
+}
+
+void sendAckTemperatureResponse(const uint8_t* mac, const TemperatureCommand& payload, bool success) {
+  TemperatureResponse response = {};
+  response.temperature = payload.temperature;
+  response.success = success;
+
+  esp_err_t result = coms.send(mac, MSG_TYPE_TEMPERATURE_RESPONSE, response);
+  if (result == ESP_OK) {
+    Serial.println("ACK sent successfully");
+  } else {
+    Serial.print("Failed to send ACK.");
+  }
 }
 
 // void sendAck(uint8_t *mac, uint16_t msgId) {

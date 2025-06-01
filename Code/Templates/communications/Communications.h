@@ -51,6 +51,7 @@ public:
 
   int getPeerCount() const;
   const Peer* getPeer(int index) const;
+  const Peer* getPeerByName(const char* name) const;
 
   static String macToString(const uint8_t* mac);
   static void printMac();

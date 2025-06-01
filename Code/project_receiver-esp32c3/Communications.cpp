@@ -94,6 +94,15 @@ const Peer* Communications::getPeer(int index) const {
   return &knownPeers[index];
 }
 
+const Peer* Communications::getPeerByName(const char* name) const {
+  for (int i = 0; i < peerCount; ++i) {
+    if (strncmp(knownPeers[i].name, name, MAX_NAME_LEN) == 0) {
+      return &knownPeers[i];
+    }
+  }
+  return nullptr;
+}
+
 void Communications::onDataSent(const uint8_t* mac_addr, esp_now_send_status_t status) {
   Serial.printf("Sent to %s %s\n", macToString(mac_addr).c_str(),
                 status == ESP_NOW_SEND_SUCCESS ? "Success" : "Fail");
