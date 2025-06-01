@@ -147,7 +147,13 @@ bool Communications::isDiscoveryMessage(const MessageHeader& msg) {
 }
 
 void Communications::handleDiscovery(const uint8_t* mac, const DiscoveryPayload& payload) {
-  if (isKnownPeer(mac)) return;
+  if (isKnownPeer(mac)) {
+    if (!payload.isResponse) {
+      sendDiscoveryResponse(mac);
+    }
+    
+    return;
+  }
 
   if (peerCount >= MAX_PEERS) {
     Serial.println("Max peers reached; ignoring new discovery.");
@@ -162,6 +168,10 @@ void Communications::handleDiscovery(const uint8_t* mac, const DiscoveryPayload&
   peer.name[MAX_NAME_LEN - 1] = '\0';
 
   Serial.printf("Discovered new peer: %s (%s)\n", peer.name, macToString(mac).c_str());
+
+  if (!payload.isResponse) {
+    sendDiscoveryResponse(mac);
+  }
 }
 
 bool Communications::isKnownPeer(const uint8_t* mac) {
@@ -185,3 +195,14 @@ bool Communications::addPeer(const uint8_t* mac) {
     return false;
   }
 }
+
+void Communications::sendDiscoveryResponse(const uint8_t* mac) {
+  DiscoveryPayload responsePayload = {};
+  strncpy(responsePayload.name, deviceName, MAX_NAME_LEN - 1);
+  responsePayload.isResponse = true;
+
+  send(mac, DISCOVERY_MSG_TYPE, reinterpret_cast<const uint8_t*>(&responsePayload), sizeof(responsePayload));
+
+  Serial.printf("Sent discovery response to %s\n", macToString(mac).c_str());
+}
+

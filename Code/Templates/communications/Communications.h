@@ -25,6 +25,7 @@ struct Peer {
 
 struct DiscoveryPayload {
   char name[MAX_NAME_LEN];
+  bool isResponse; // true if this is a reply
 };
 
 class Communications {
@@ -42,6 +43,7 @@ public:
 
     return send(addr, type, reinterpret_cast<const uint8_t*>(&payload), sizeof(T));
   }
+  void sendDiscoveryResponse(const uint8_t* mac);
 
   void setReceiveHandler(std::function<void(const uint8_t* mac, uint8_t type, const uint8_t* data, int len)> handler);
   void setSendHandler(std::function<void(const uint8_t*, esp_now_send_status_t)> handler);
