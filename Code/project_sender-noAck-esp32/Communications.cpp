@@ -90,6 +90,17 @@ void Communications::setName(const char* name) {
   deviceName[MAX_NAME_LEN - 1] = '\0';
 }
 
+void Communications::addToDiscoveryWhitelist(const char* name) {
+  if (whitelistCount >= MAX_WHITELIST) {
+    Serial.println("Whitelist full, cannot add more names.");
+    return;
+  }
+
+  strncpy(whitelist[whitelistCount], name, MAX_NAME_LEN - 1);
+  whitelist[whitelistCount][MAX_NAME_LEN - 1] = '\0';
+  whitelistCount++;
+}
+
 int Communications::getPeerCount() const {
   return peerCount;
 }
@@ -161,6 +172,20 @@ bool Communications::isDiscoveryMessage(const MessageHeader& msg) {
 }
 
 void Communications::handleDiscovery(const uint8_t* mac, const DiscoveryPayload& payload) {
+  // Reject if not on whitelist
+  bool allowed = false;
+  for (int i = 0; i < whitelistCount; ++i) {
+    if (strncmp(payload.name, whitelist[i], MAX_NAME_LEN) == 0) {
+      allowed = true;
+      break;
+    }
+  }
+
+  if (!allowed) {
+    Serial.printf("Discovery ignored: '%s' not in whitelist.\n", payload.name);
+    return;
+  }
+  
   if (isKnownPeer(mac)) {
     if (!payload.isResponse) {
       sendDiscoveryResponse(mac);

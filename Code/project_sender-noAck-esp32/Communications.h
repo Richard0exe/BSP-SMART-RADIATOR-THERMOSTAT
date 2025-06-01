@@ -11,6 +11,7 @@
 #define MAX_NAME_LEN 32
 #define DISCOVERY_MSG_TYPE 0
 #define MESSAGE_MAGIC 0x42A7
+#define MAX_WHITELIST 4
 
 typedef struct {
   uint16_t magic;
@@ -48,7 +49,9 @@ public:
   void setReceiveHandler(std::function<void(const uint8_t* mac, uint8_t type, const uint8_t* data, int len)> handler);
   void setSendHandler(std::function<void(const uint8_t*, esp_now_send_status_t)> handler);
   void setDiscoveryHandler(std::function<void(const Peer&)> handler);
+
   void setName(const char* name);
+  void addToDiscoveryWhitelist(const char* name);
 
   int getPeerCount() const;
   const Peer* getPeer(int index) const;
@@ -64,6 +67,9 @@ private:
 
   Peer knownPeers[MAX_PEERS];
   int peerCount = 0;
+
+  char whitelist[MAX_WHITELIST][MAX_NAME_LEN];
+  int whitelistCount = 0;
 
   static void onDataRecv(const esp_now_recv_info_t* recvInfo, const uint8_t* data, int len);
   static void onDataSent(const uint8_t* mac_addr, esp_now_send_status_t status);
