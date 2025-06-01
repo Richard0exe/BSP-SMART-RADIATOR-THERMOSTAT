@@ -3,9 +3,9 @@
 #include <Adafruit_SSD1306.h>
 #include <DHT.h>
 #include <DHT_U.h>
-#include <WiFi.h>
-#include <esp_now.h>
 #include <ArduinoJson.h>
+#include "Communications.h"
+#include "Messages.h"
 
 #define DEBUG FALSE // CHANGE TO TRUE TO ENABLE SERIAL OUTPUTS 
 
@@ -32,6 +32,9 @@
 #define MAX_TEMP 28
 
 #define DEFAULT_TEMP 20
+#define MAX_RADIATORS 10
+
+Communications coms;
 
 uint8_t commonTemp = DEFAULT_TEMP;
 bool tempChanged = false;
@@ -70,13 +73,6 @@ int button_state;
 // Set the MAC address of the receiver (replace with the actual MAC address)
 uint8_t receiverMacAddress[] = {0x8C, 0x4F, 0x00, 0x42, 0x02, 0x25}; // Your MAC address
 
-// Data structure to send via ESP-NOW
-typedef struct struct_message {
-  uint8_t msgType; // Now only type DATA
-  uint16_t msgId;
-  uint8_t temp; 
-} struct_message;
-
 typedef struct { 
   uint8_t mac[6];
   char name[16];
@@ -84,73 +80,80 @@ typedef struct {
   bool ackReceived; 
 } Radiator;
 
-Radiator radiators[] = {
-  { {0x98, 0x88, 0xE0, 0xD9, 0xCB, 0x18}, "Room 1", DEFAULT_TEMP},
-  { {0x8C, 0x4F, 0x00, 0x42, 0x02, 0x28}, "Room 2", DEFAULT_TEMP}, // some fake MAC for testing 
-};
-
-const int numRadiators = sizeof(radiators) / sizeof(radiators[0]);
+Radiator radiators[MAX_RADIATORS];
+int numRadiators = 0; // Track how many are currently in use
 
 // -1 - all, 0-n - all radiators in radiators array
 int currentRadiatorIndex = -1;
 
-struct_message myData;
-
-static uint16_t lastMsgId  = 0;
-
-enum MessageType {
-  DATA = 0,
-  ACK = 1
-  };
-MessageType messageType;
-
-// Setup ESP-NOW communication
-void OnDataSent(const unsigned char *mac_addr, esp_now_send_status_t sendStatus) {
-  Serial.print("Send Status to ");
-
-  //Find to which radiator data was sent succesfully
-  bool found = false;
-  for(int i = 0; i < numRadiators; i++){
-    // compare to memory blocks byte by byte , MAC address = 6 bytes 
-    if(memcmp(mac_addr, radiators[i].mac, 6) == 0){
-      Serial.print((radiators[i].name));
-      found = true;
-
-      // Update ackReceived based on send status
-      if (sendStatus == ESP_NOW_SEND_SUCCESS) {
-        radiators[i].ackReceived = true;  // Success
-      } else {
-        radiators[i].ackReceived = false; // Failure
+void OnDataRecv(const uint8_t* mac, uint8_t type, const uint8_t* data, int len){
+  switch (type) {
+    case MSG_TYPE_TEMPERATURE_RESPONSE:
+      if (len == sizeof(TemperatureResponse)) {
+        TemperatureResponse payload;
+        memcpy(&payload, data, sizeof(payload));
+        ProcessTemperatureResponse(mac, payload);
       }
       break;
-    }
-  }
-  if(!found) {
-    Serial.print("Unknown device");
-  }
 
-  Serial.print(": "); 
-  if (sendStatus == 0) {
-    Serial.println("Success");
-  } else {
-     Serial.println("Fail");
+    default:
+      Serial.println("Unknown message type");
+      break;
   }
 }
 
-// void OnDataRecv(uint8_t *mac, uint8_t *incomingData, uint8_t len){
-//   struct_message incomingMsg;
-//   memcpy(&incomingMsg, incomingData, sizeof(incomingMsg));
+void ProcessTemperatureResponse(const uint8_t* mac, const TemperatureResponse& payload) {
+  if (!payload.success) {
+    Serial.printf("ACK received. Failed to set temperature on device [%s] (attempted %d°C)\n",
+                  Communications::macToString(mac).c_str(), payload.temperature);
+    return;
+  }
 
-//   if(incomingMsg.msgType == ACK){
-//     for (int i = 0; i < numRadiators; i++) {
-//       if (memcmp(mac, radiators[i].mac, 6) == 0 && incomingMsg.msgId == lastMsgId) {
-//         radiators[i].ackReceived = true;
-//         Serial.print("ACK received from ");
-//         Serial.println(radiators[i].name);
-//       } 
-//     }
-//   }
-// }
+  for (int i = 0; i < numRadiators; i++) {
+    if (memcmp(mac, radiators[i].mac, 6) == 0) {
+      radiators[i].ackReceived = true;
+      Serial.printf("ACK received from %s: Temperature set to %d°C\n",
+                    radiators[i].name, payload.temperature);
+      return;
+    }
+  }
+
+  // Successful response from an unknown MAC
+  Serial.printf("Temperature set on unknown device [%s]: %d°C\n",
+                Communications::macToString(mac).c_str(), payload.temperature);
+}
+
+void OnDiscoverNewPeer(const Peer& peer) {
+  // Only register if it's a radiator
+  if (strncmp(peer.name, "radiator", MAX_NAME_LEN) != 0) {
+    Serial.printf("Discovered non-radiator device: %s (%s)\n", peer.name, Communications::macToString(peer.mac).c_str());
+    return;
+  }
+
+  // Check for duplicate MAC
+  for (int i = 0; i < numRadiators; ++i) {
+    if (memcmp(radiators[i].mac, peer.mac, 6) == 0) {
+      return; // Already added
+    }
+  }
+
+  if (numRadiators >= MAX_RADIATORS) {
+    Serial.println("Maximum number of radiators reached. Skipping.");
+    return;
+  }
+
+  // Add new radiator
+  Radiator& r = radiators[numRadiators++];
+  memcpy(r.mac, peer.mac, 6);
+
+  // Auto-generate name: "Room X"
+  snprintf(r.name, sizeof(r.name), "Room %d", numRadiators);
+
+  r.curr_temp = DEFAULT_TEMP;
+  r.ackReceived = false;
+
+  Serial.printf("New radiator added: %s [%s]\n", r.name, Communications::macToString(r.mac).c_str());
+}
 
 void setup() {
   Serial.begin(115200);
@@ -175,31 +178,14 @@ void setup() {
   display.clearDisplay();
   display.setTextColor(WHITE);
   
-  // Initialize Wi-Fi for ESP-NOW
-  WiFi.mode(WIFI_STA);
-  WiFi.disconnect(); // Ensure Wi-Fi is off
-  //WiFi.channel(ESPNOW_CHANNEL);
-  
-  // Initialize ESP-NOW
-  if (esp_now_init() != 0) {
-    Serial.println("Error initializing ESP-NOW");
-    return;
-  }
+  // Initialize communications
+  coms.begin();
+  coms.setName("server");
 
-  esp_now_register_send_cb(OnDataSent);
+  coms.setReceiveHandler(OnDataRecv);
+  coms.setDiscoveryHandler(OnDiscoverNewPeer);
 
-  //esp_now_register_recv_cb(OnDataRecv);
-  
-  // Add the receiver as a peer
- for (int i = 0; i < numRadiators; i++) {
-  esp_now_peer_info_t peerInfo;
-  memset(&peerInfo, 0, sizeof(peerInfo));
-  memcpy(peerInfo.peer_addr, radiators[i].mac, 6);
-  //peerInfo.channel = ESPNOW_CHANNEL;
-  peerInfo.encrypt = false;
-  
-  esp_now_add_peer(&peerInfo);
-}
+  coms.broadcastDiscovery();
 }
 
 // bool waitForAck(Radiator &targetRadiator, unsigned long timeoutMs = 1000, uint8_t maxRetries = 3){
@@ -268,6 +254,21 @@ void sendRadiatorsToWeb(){
 //process received json and update the radiators struct array
 void processJSON(String jsonStr){
 
+}
+
+void sendTemperatureCommand(const uint8_t* mac, uint8_t temperature) {
+  TemperatureCommand cmd = {};
+  cmd.temperature = temperature;
+
+  esp_err_t result = coms.send(mac, MSG_TYPE_TEMPERATURE_COMMAND, cmd);
+
+  if (result == ESP_OK) {
+    Serial.printf("Sent temperature command to [%s]: %d°C\n",
+                  Communications::macToString(mac).c_str(), temperature);
+  } else {
+    Serial.printf("Failed to send temperature command to [%s]: error code %d\n",
+                  Communications::macToString(mac).c_str(), result);
+  }
 }
 
 static uint8_t lastSentTemperature = 0;
@@ -357,14 +358,7 @@ if (tempChanged) {
     radiators[i].curr_temp = commonTemp;
     radiators[i].ackReceived = false;
 
-    lastMsgId++;
-    if (lastMsgId == 0) lastMsgId = 1;
-
-    myData.msgType = DATA;
-    myData.msgId = lastMsgId;
-    myData.temp = commonTemp;
-
-    esp_now_send(radiators[i].mac, (uint8_t *)&myData, sizeof(myData));
+    sendTemperatureCommand(radiators[i].mac, commonTemp);
   }
 
   lastSendTime = millis();
@@ -383,27 +377,11 @@ if(encoderClicked){
     if (currentRadiatorIndex == -1) {
     // Send to all radiators
     for (int i = 0; i < numRadiators; i++) {
-      lastMsgId++;
-      if (lastMsgId == 0) lastMsgId = 1; // avoid 0
-
-      myData.msgType = DATA;
-      myData.msgId = lastMsgId;
-      myData.temp = commonTemp;
-
-      esp_now_send(radiators[i].mac, (uint8_t *)&myData, sizeof(myData));
-      //waitForAck(radiators[i]);
+      sendTemperatureCommand(radiators[i].mac, commonTemp);
     }
   } else {
     // Send only to selected radiator
-    lastMsgId++;
-    if (lastMsgId == 0) lastMsgId = 1;
-
-    myData.msgType = DATA;
-    myData.msgId = lastMsgId;
-    myData.temp = radiators[currentRadiatorIndex].curr_temp;
-
-    esp_now_send(radiators[currentRadiatorIndex].mac, (uint8_t *)&myData, sizeof(myData));
-    //waitForAck(radiators[currentRadiatorIndex]);
+    sendTemperatureCommand(radiators[currentRadiatorIndex].mac, radiators[currentRadiatorIndex].curr_temp);
   }
 
   lastSendTime = millis();
