@@ -47,6 +47,7 @@ public:
 
   void setReceiveHandler(std::function<void(const uint8_t* mac, uint8_t type, const uint8_t* data, int len)> handler);
   void setSendHandler(std::function<void(const uint8_t*, esp_now_send_status_t)> handler);
+  void setDiscoveryHandler(std::function<void(const Peer&)> handler);
   void setName(const char* name);
 
   int getPeerCount() const;
@@ -74,6 +75,8 @@ private:
 
   std::function<void(const uint8_t*, uint8_t, const uint8_t*, int)> userRecvHandler;
   std::function<void(const uint8_t*, esp_now_send_status_t)> userSendHandler;
+  std::function<void(const Peer&)> discoveryHandler;
+
 };
 
 #endif

@@ -12,6 +12,7 @@ void Communications::begin() {
   } 
 
   WiFi.mode(WIFI_STA);
+  WiFi.disconnect();
   if (esp_now_init() != ESP_OK) {
     Serial.println("Error initializing ESP-NOW");
     return;
@@ -78,6 +79,10 @@ void Communications::setReceiveHandler(std::function<void(const uint8_t*, uint8_
 
 void Communications::setSendHandler(std::function<void(const uint8_t*, esp_now_send_status_t)> handler) {
   userSendHandler = handler;
+}
+
+void Communications::setDiscoveryHandler(std::function<void(const Peer&)> handler) {
+  discoveryHandler = handler;
 }
 
 void Communications::setName(const char* name) {
@@ -180,6 +185,10 @@ void Communications::handleDiscovery(const uint8_t* mac, const DiscoveryPayload&
 
   if (!payload.isResponse) {
     sendDiscoveryResponse(mac);
+  }
+
+  if (discoveryHandler) {
+    discoveryHandler(peer);
   }
 }
 
