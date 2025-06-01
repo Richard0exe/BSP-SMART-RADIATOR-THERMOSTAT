@@ -79,20 +79,24 @@ void sendAckTemperatureResponse(const uint8_t* mac, const TemperatureCommand& pa
   }
 }
 
-// void sendAck(uint8_t *mac, uint16_t msgId) {
-//   struct_message ackMsg;
-//   ackMsg.msgType = ACK;
-//   ackMsg.msgId = msgId;
-//   ackMsg.temp = 0;
+void discoverServer() {
+  while(!isServerDiscovered()) {
+    Serial.println("Trying to discover server...");
+    coms.broadcastDiscovery();
 
-//   esp_err_t result = esp_now_send(mac, (uint8_t *)&ackMsg, sizeof(ackMsg));
-//   if (result == ESP_OK) {
-//     Serial.println("ACK sent successfully");
-//   } else {
-//     Serial.print("Failed to send ACK. Error code: ");
-//     Serial.println(result);
-//   }
-// }
+    // TODO: Exponentional backoff?
+    delay(5000);
+  }
+}
+
+bool isServerDiscovered() {
+  const Peer* server = coms.getPeerByName("server");
+  if (!server) {
+    return false;
+  }
+
+  return true;
+}
 
 void setup() {
   // Initialize Serial Monitor
@@ -101,6 +105,7 @@ void setup() {
 
   coms.begin();
   coms.setName("radiator");
+  coms.addToDiscoveryWhitelist("server"); // we only want to discover the server and not other radiators
   
   // Register to receive the data
   coms.setReceiveHandler(OnDataRecv);
@@ -110,6 +115,9 @@ void setup() {
   // Setup the stepper motor
   stepper.setMaxSpeed(1000);
   stepper.setAcceleration(500);
+
+  // Loops broadcastDiscovery until server is found
+  discoverServer();
 }
 
 void loop() {
