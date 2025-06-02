@@ -174,10 +174,14 @@ bool Communications::isDiscoveryMessage(const MessageHeader& msg) {
 void Communications::handleDiscovery(const uint8_t* mac, const DiscoveryPayload& payload) {
   // Reject if not on whitelist
   bool allowed = false;
-  for (int i = 0; i < whitelistCount; ++i) {
-    if (strncmp(payload.name, whitelist[i], MAX_NAME_LEN) == 0) {
-      allowed = true;
-      break;
+  if (whitelistCount == 0) {
+    allowed = true;
+  } else {
+    for (int i = 0; i < whitelistCount; ++i) {
+      if (strncmp(payload.name, whitelist[i], MAX_NAME_LEN) == 0) {
+        allowed = true;
+        break;
+      }
     }
   }
 
