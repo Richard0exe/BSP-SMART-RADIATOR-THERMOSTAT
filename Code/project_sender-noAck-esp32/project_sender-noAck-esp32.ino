@@ -6,6 +6,7 @@
 #include <ArduinoJson.h>
 #include "Communications.h"
 #include "Messages.h"
+#include "RadiatorManager.h"
 
 #define DEBUG FALSE // CHANGE TO TRUE TO ENABLE SERIAL OUTPUTS 
 
@@ -28,15 +29,12 @@
 #define ENCODER_DT  26  // D6
 #define ENCODER_SW  14  // D0 (reuses your button)
 
-#define MIN_TEMP 8
-#define MAX_TEMP 28
-
-#define DEFAULT_TEMP 20
-#define MAX_RADIATORS 10
-
 Communications coms;
+RadiatorManager radiatorManager(coms);
 
 uint8_t commonTemp = DEFAULT_TEMP;
+uint8_t rotatorTemp = commonTemp;
+uint8_t shownTemp = rotatorTemp;
 bool tempChanged = false;
 
 String PARAM_MESSAGE = "temperature";
@@ -70,19 +68,6 @@ DHT dht(DHT_PIN, DHT_TYPE);
 int prev_button_state = HIGH;
 int button_state;
 
-// Set the MAC address of the receiver (replace with the actual MAC address)
-uint8_t receiverMacAddress[] = {0x8C, 0x4F, 0x00, 0x42, 0x02, 0x25}; // Your MAC address
-
-typedef struct { 
-  uint8_t mac[6];
-  char name[16];
-  uint8_t curr_temp; // hold current temp for each radiator
-  bool ackReceived; 
-} Radiator;
-
-Radiator radiators[MAX_RADIATORS];
-int numRadiators = 0; // Track how many are currently in use
-
 // -1 - all, 0-n - all radiators in radiators array
 int currentRadiatorIndex = -1;
 
@@ -92,7 +77,7 @@ void OnDataRecv(const uint8_t* mac, uint8_t type, const uint8_t* data, int len){
       if (len == sizeof(TemperatureResponse)) {
         TemperatureResponse payload;
         memcpy(&payload, data, sizeof(payload));
-        ProcessTemperatureResponse(mac, payload);
+        radiatorManager.processTemperatureResponse(mac, payload);
       }
       break;
 
@@ -102,57 +87,13 @@ void OnDataRecv(const uint8_t* mac, uint8_t type, const uint8_t* data, int len){
   }
 }
 
-void ProcessTemperatureResponse(const uint8_t* mac, const TemperatureResponse& payload) {
-  if (!payload.success) {
-    Serial.printf("ACK received. Failed to set temperature on device [%s] (attempted %d°C)\n",
-                  Communications::macToString(mac).c_str(), payload.temperature);
-    return;
-  }
-
-  for (int i = 0; i < numRadiators; i++) {
-    if (memcmp(mac, radiators[i].mac, 6) == 0) {
-      radiators[i].ackReceived = true;
-      Serial.printf("ACK received from %s: Temperature set to %d°C\n",
-                    radiators[i].name, payload.temperature);
-      return;
-    }
-  }
-
-  // Successful response from an unknown MAC
-  Serial.printf("Temperature set on unknown device [%s]: %d°C\n",
-                Communications::macToString(mac).c_str(), payload.temperature);
-}
-
 void OnDiscoverNewPeer(const Peer& peer) {
-  // Only register if it's a radiator
-  if (strncmp(peer.name, "radiator", MAX_NAME_LEN) != 0) {
-    Serial.printf("Discovered non-radiator device: %s (%s)\n", peer.name, Communications::macToString(peer.mac).c_str());
-    return;
-  }
-
-  // Check for duplicate MAC
-  for (int i = 0; i < numRadiators; ++i) {
-    if (memcmp(radiators[i].mac, peer.mac, 6) == 0) {
-      return; // Already added
-    }
-  }
-
-  if (numRadiators >= MAX_RADIATORS) {
-    Serial.println("Maximum number of radiators reached. Skipping.");
-    return;
-  }
-
   // Add new radiator
-  Radiator& r = radiators[numRadiators++];
-  memcpy(r.mac, peer.mac, 6);
-
-  // Auto-generate name: "Room X"
-  snprintf(r.name, sizeof(r.name), "Room %d", numRadiators);
-
-  r.curr_temp = DEFAULT_TEMP;
-  r.ackReceived = false;
-
-  Serial.printf("New radiator added: %s [%s]\n", r.name, Communications::macToString(r.mac).c_str());
+  if (strncmp(peer.name, "radiator", MAX_NAME_LEN) == 0) {
+    radiatorManager.handleDiscovery(peer);
+  } else {
+    Serial.printf("Discovered unknown type device: %s (%s)\n", peer.name, Communications::macToString(peer.mac).c_str());
+  }
 }
 
 void setup() {
@@ -188,50 +129,12 @@ void setup() {
   coms.broadcastDiscovery();
 }
 
-// bool waitForAck(Radiator &targetRadiator, unsigned long timeoutMs = 1000, uint8_t maxRetries = 3){
-//   int retries = 0;
-
-//   while(retries < maxRetries){
-//   unsigned long start = millis();
-//   targetRadiator.ackReceived = false;
-
-//   while(!targetRadiator.ackReceived && (millis() - start < timeoutMs)) {
-//     delay(1);
-//   }
-
-//   if (!targetRadiator.ackReceived) {
-//     Serial.println("ACK not received (timeout)");
-//     retries++;
-//   } else {
-//     Serial.println("ACK received");
-//     return true;
-//   }
-//   }
-//   // After max retries
-//   Serial.println("Failed to receive ACK after retries.");
-//   return false;
-// }
-
-void setALLTemperature(String temperature){
-  int temp = temperature.toInt();
-
-  // Check if the temperature is within the valid range
-  if (temp >= MIN_TEMP && temp <= MAX_TEMP) {
-    // Also update the common temperature
-    commonTemp = temp;
-    tempChanged = true;
-    // Debug print to show that temperature has been updated
-    Serial.print("Set temperature to: ");
-    Serial.println(temp);
-  }
-  return;
-}
-
 void sendRadiatorsToWeb(){
+  const Radiator* radiators = radiatorManager.getRadiators();
   StaticJsonDocument<768> doc;
   JsonArray arr = doc.to<JsonArray>();
 
-  for (int i = 0; i < numRadiators; i++) {
+  for (int i = 0; i < radiatorManager.getNumRadiators(); i++) {
     JsonObject obj = arr.createNestedObject();
 
     char macStr[18];
@@ -256,21 +159,6 @@ void processJSON(String jsonStr){
 
 }
 
-void sendTemperatureCommand(const uint8_t* mac, uint8_t temperature) {
-  TemperatureCommand cmd = {};
-  cmd.temperature = temperature;
-
-  esp_err_t result = coms.send(mac, MSG_TYPE_TEMPERATURE_COMMAND, cmd);
-
-  if (result == ESP_OK) {
-    Serial.printf("Sent temperature command to [%s]: %d°C\n",
-                  Communications::macToString(mac).c_str(), temperature);
-  } else {
-    Serial.printf("Failed to send temperature command to [%s]: error code %d\n",
-                  Communications::macToString(mac).c_str(), result);
-  }
-}
-
 static uint8_t lastSentTemperature = 0;
 static unsigned long lastSendTime = 0;
 static unsigned long lastWebSendTime = 0;
@@ -282,26 +170,46 @@ int encoderClicked = false;
 
 bool buttonClicked = false;
 
-void loop() {
-
-//constantly reading Serial2 waiting for some info
+String readSerial2Line() {
+  static String buffer = "";
   while (Serial2.available()) {
-    String incoming = Serial2.readStringUntil('\n');
+    char c = Serial2.read();
+    if (c == '\n') {
+      String line = buffer;
+      buffer = "";
+      return line;
+    } else {
+      buffer += c;
+    }
+  }
+  return "";  // Nothing complete yet
+}
+
+
+void readFromWebServer() {
+  String incoming = readSerial2Line();
+  if (incoming.length() > 0) {
     Serial.print("Received from WEB: ");
     Serial.println(incoming);
 
-    // Check if it starts with "ALL/T"
+    // Handle command
     if (incoming.startsWith("ALL/T")) {
-    String tempStr = incoming.substring(5); // Extract "23" from "ALL/T23"
-    setALLTemperature(tempStr);
+      String tempStr = incoming.substring(5); // Extract "23" from "ALL/T23"
+      radiatorManager.sendTemperatureToAll(tempStr.toInt());
     }
   }
+}
 
-// send some info to webserver every time n period
-  if((millis() - lastWebSendTime) > sendInterval){
-    sendRadiatorsToWeb();
-    lastWebSendTime = millis();
-  }
+
+void loop() {
+// //  constantly reading Serial2 waiting for some info
+//   readFromWebServer();
+
+// // send some info to webserver every time n period
+//   if((millis() - lastWebSendTime) > sendInterval){
+//     sendRadiatorsToWeb();
+//     lastWebSendTime = millis();
+//   }
 
   button_state = digitalRead(BUTTON_PIN);
 
@@ -311,16 +219,20 @@ void loop() {
     buttonClicked = true;
 
     currentRadiatorIndex++;
-    if(currentRadiatorIndex >= numRadiators){
+    if(currentRadiatorIndex >= radiatorManager.getNumRadiators()){
       currentRadiatorIndex = -1;
     }
 
     Serial.print("Selected: ");
     if (currentRadiatorIndex == -1) {
+      shownTemp = commonTemp;
       Serial.println("ALL radiators");
     } else {
-      Serial.println(radiators[currentRadiatorIndex].name);
+      shownTemp = radiatorManager.getRadiatorTemperature(currentRadiatorIndex);
+      Serial.println(radiatorManager.getRadiatorName(currentRadiatorIndex));
     }
+
+    rotatorTemp = shownTemp; 
   }
 
   prev_button_state = button_state;
@@ -336,55 +248,21 @@ lastEncoderButtonState = encoderButtonState;
 int currentState = digitalRead(ENCODER_CLK);
 if(currentState != lastEncoderState && currentState == LOW){
   int delta = (digitalRead(ENCODER_DT) != currentState) ? 1 : -1;
-
-  if(currentRadiatorIndex == -1){
-    commonTemp = constrain(commonTemp + delta, MIN_TEMP, MAX_TEMP);
-   // Apply to all radiators
-    for (int i = 0; i < numRadiators; i++) {
-      radiators[i].curr_temp = commonTemp;
-    }
-  } else {
-    radiators[currentRadiatorIndex].curr_temp = constrain(radiators[currentRadiatorIndex].curr_temp + delta, MIN_TEMP, MAX_TEMP);
-  }
+  rotatorTemp = constrain(rotatorTemp + delta, MIN_TEMP, MAX_TEMP);
+  shownTemp = rotatorTemp;
   }
 lastEncoderState = currentState;
 
-if (tempChanged) {
-  // Temperature was changed via Web UI
-  tempChanged = false;
-
-  // Apply temperature to all radiators
-  for (int i = 0; i < numRadiators; i++) {
-    radiators[i].curr_temp = commonTemp;
-    radiators[i].ackReceived = false;
-
-    sendTemperatureCommand(radiators[i].mac, commonTemp);
-  }
-
-  lastSendTime = millis();
-}
-
-//if(((millis() - lastSendTime) > sendInterval) || encoderClicked){ use to send between time interval
 if(encoderClicked){
   if (currentRadiatorIndex == -1) {
-  for (int i = 0; i < numRadiators; i++) {
-    radiators[i].ackReceived = false;
-  }
-  } else {
-    radiators[currentRadiatorIndex].ackReceived = false;
-  }
-
-    if (currentRadiatorIndex == -1) {
     // Send to all radiators
-    for (int i = 0; i < numRadiators; i++) {
-      sendTemperatureCommand(radiators[i].mac, commonTemp);
-    }
+    commonTemp = rotatorTemp;
+    radiatorManager.sendTemperatureToAll(commonTemp);
   } else {
     // Send only to selected radiator
-    sendTemperatureCommand(radiators[currentRadiatorIndex].mac, radiators[currentRadiatorIndex].curr_temp);
+    radiatorManager.sendTemperatureTo(currentRadiatorIndex, rotatorTemp);
   }
 
-  lastSendTime = millis();
   buttonClicked = false;
 }
 
@@ -408,14 +286,14 @@ if(encoderClicked){
   //if 1 from all radiators dont confirm receiving, print CROSS
   bool allAcks = true;
   if (currentRadiatorIndex == -1) {
-  for (int i = 0; i < numRadiators; i++) {
-    if (!radiators[i].ackReceived) {
+  for (int i = 0; i < radiatorManager.getNumRadiators(); i++) {
+    if (!radiatorManager.isAcked(i)) {
       allAcks = false;
       break;
     }
   }
 } else {
-  if (!radiators[currentRadiatorIndex].ackReceived) {
+  if (!radiatorManager.isAcked(currentRadiatorIndex)) {
     allAcks = false;
   }
 }
@@ -433,11 +311,10 @@ if(encoderClicked){
   if (currentRadiatorIndex == -1) {
     display.print("All");
   } else {
-    display.print(radiators[currentRadiatorIndex].name);
+    display.print(radiatorManager.getRadiatorName(currentRadiatorIndex));
   }
 
   // Display potentiometer-based temperature
-  uint8_t shownTemp = (currentRadiatorIndex == -1) ? commonTemp : radiators[currentRadiatorIndex].curr_temp;
   display.setTextSize(3);
   display.setCursor(48, 0);
   display.print(shownTemp);
