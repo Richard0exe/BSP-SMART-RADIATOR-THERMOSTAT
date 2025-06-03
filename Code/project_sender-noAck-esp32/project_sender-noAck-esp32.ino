@@ -7,10 +7,9 @@
 #include "Communications.h" 
 #include "Messages.h"
 #include "RadiatorManager.h"
+#include "RadiatorDisplay.h"
 
 #define DEBUG FALSE // CHANGE TO TRUE TO ENABLE SERIAL OUTPUTS 
-
-#define ESPNOW_CHANNEL 6
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 32 // OLED display height, in pixels
@@ -29,47 +28,13 @@
 #define ENCODER_DT  26  // D6
 #define ENCODER_SW  14  // D0 (reuses your button)
 
-Communications coms;
-RadiatorManager radiatorManager(coms);
-
-uint8_t commonTemp = DEFAULT_TEMP;
-uint8_t rotatorTemp = commonTemp;
-uint8_t shownTemp = rotatorTemp;
-bool tempChanged = false;
-
-String PARAM_MESSAGE = "temperature";
-
-const unsigned char check_icon [] PROGMEM = {
-  0b00000000,
-  0b00000001,
-  0b00000011,
-  0b00000110,
-  0b10001100,
-  0b11011000,
-  0b01110000,
-  0b00100000
-};
-
-const unsigned char cross_icon [] PROGMEM = {
-  0b10000001,
-  0b01000010,
-  0b00100100,
-  0b00011000,
-  0b00011000,
-  0b00100100,
-  0b01000010,
-  0b10000001
-};
-
 // Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 DHT dht(DHT_PIN, DHT_TYPE);
 
-int prev_button_state = HIGH;
-int button_state;
-
-// -1 - all, 0-n - all radiators in radiators array
-int currentRadiatorIndex = -1;
+Communications coms;
+RadiatorManager radiatorManager(coms);
+RadiatorDisplay radiatorDisplay(display);
 
 void OnDataRecv(const uint8_t* mac, uint8_t type, const uint8_t* data, int len){
   switch (type) {
@@ -116,8 +81,7 @@ void setup() {
     for (;;);
   }
   delay(2000);
-  display.clearDisplay();
-  display.setTextColor(WHITE);
+  radiatorDisplay.begin();
   
   // Initialize communications
   coms.begin();
@@ -164,6 +128,17 @@ static unsigned long lastSendTime = 0;
 static unsigned long lastWebSendTime = 0;
 const uint16_t sendInterval = 10000; // 10 seconds delay
 
+uint8_t commonTemp = DEFAULT_TEMP;
+uint8_t rotatorTemp = commonTemp;
+uint8_t shownTemp = rotatorTemp;
+bool tempChanged = false;
+
+int prev_button_state = HIGH;
+int button_state;
+
+// -1 - all, 0-n - all radiators in radiators array
+int currentRadiatorIndex = -1;
+
 int lastEncoderButtonState = HIGH;
 int lastEncoderState = HIGH;
 int encoderClicked = false;
@@ -202,10 +177,10 @@ void readFromWebServer() {
 
 
 void loop() {
-//  constantly reading Serial2 waiting for some info
+  // constantly reading Serial2 waiting for some info
   readFromWebServer();
 
-// send some info to webserver every time n period
+  // send some info to webserver every time n period
   if((millis() - lastWebSendTime) > sendInterval){
     sendRadiatorsToWeb();
     lastWebSendTime = millis();
@@ -213,7 +188,7 @@ void loop() {
 
   button_state = digitalRead(BUTTON_PIN);
 
-// External button pess logic
+  // External button pess logic
   if(button_state == LOW && prev_button_state == HIGH){
     delay(50);
     buttonClicked = true;
@@ -237,34 +212,34 @@ void loop() {
 
   prev_button_state = button_state;
 
-int encoderButtonState = digitalRead(ENCODER_SW);
-if(encoderButtonState == LOW && lastEncoderButtonState == HIGH){
-  encoderClicked = true;
-} else {
-  encoderClicked = false;
-}
-lastEncoderButtonState = encoderButtonState;
-
-int currentState = digitalRead(ENCODER_CLK);
-if(currentState != lastEncoderState && currentState == LOW){
-  int delta = (digitalRead(ENCODER_DT) != currentState) ? 1 : -1;
-  rotatorTemp = constrain(rotatorTemp + delta, MIN_TEMP, MAX_TEMP);
-  shownTemp = rotatorTemp;
-  }
-lastEncoderState = currentState;
-
-if(encoderClicked){
-  if (currentRadiatorIndex == -1) {
-    // Send to all radiators
-    commonTemp = rotatorTemp;
-    radiatorManager.sendTemperatureToAll(commonTemp);
+  int encoderButtonState = digitalRead(ENCODER_SW);
+  if(encoderButtonState == LOW && lastEncoderButtonState == HIGH){
+    encoderClicked = true;
   } else {
-    // Send only to selected radiator
-    radiatorManager.sendTemperatureTo(currentRadiatorIndex, rotatorTemp);
+    encoderClicked = false;
   }
+  lastEncoderButtonState = encoderButtonState;
 
-  buttonClicked = false;
-}
+  int currentState = digitalRead(ENCODER_CLK);
+  if(currentState != lastEncoderState && currentState == LOW){
+    int delta = (digitalRead(ENCODER_DT) != currentState) ? 1 : -1;
+    rotatorTemp = constrain(rotatorTemp + delta, MIN_TEMP, MAX_TEMP);
+    shownTemp = rotatorTemp;
+  }
+  lastEncoderState = currentState;
+
+  if(encoderClicked){
+    if (currentRadiatorIndex == -1) {
+      // Send to all radiators
+      commonTemp = rotatorTemp;
+      radiatorManager.sendTemperatureToAll(commonTemp);
+    } else {
+      // Send only to selected radiator
+      radiatorManager.sendTemperatureTo(currentRadiatorIndex, rotatorTemp);
+    }
+
+    buttonClicked = false;
+  }
 
   // Read DHT sensor values
   float temp = dht.readTemperature();
@@ -280,59 +255,11 @@ if(encoderClicked){
     // Serial.println("%");
   }
 
-  // Clear display
-  display.clearDisplay();
-  
+  // display logic
   //if 1 from all radiators dont confirm receiving, print CROSS
-  bool allAcks = true;
-  if (currentRadiatorIndex == -1) {
-  for (int i = 0; i < radiatorManager.getNumRadiators(); i++) {
-    if (!radiatorManager.isAcked(i)) {
-      allAcks = false;
-      break;
-    }
-  }
-} else {
-  if (!radiatorManager.isAcked(currentRadiatorIndex)) {
-    allAcks = false;
-  }
-}
-
-    // Show icon
-  if(allAcks){
-    display.drawBitmap(0,0, check_icon, 8, 8, WHITE);
-  } else {
-    display.drawBitmap(0,0, cross_icon, 8, 8, WHITE);
-  }
-
+  bool acked = currentRadiatorIndex == -1 ? radiatorManager.isAllAcked() : radiatorManager.isAcked(currentRadiatorIndex);
   //display choosen radiator
-  display.setTextSize(1);
-  display.setCursor(0, 24);
-  if (currentRadiatorIndex == -1) {
-    display.print("All");
-  } else {
-    display.print(radiatorManager.getRadiatorName(currentRadiatorIndex));
-  }
-
-  // Display potentiometer-based temperature
-  display.setTextSize(3);
-  display.setCursor(48, 0);
-  display.print(shownTemp);
-  display.print(" ");
-  display.setTextSize(1);
-  display.cp437(true);
-  display.write(167);  // Degree symbol
-  display.setTextSize(2);
-  display.print("C");
-
-  // Display DHT11 temperature
-  display.setTextSize(1);
-  display.setCursor(85, 24);
-  display.print("T: ");
-  display.print(temp, 0);
-  display.cp437(true);
-  display.write(167);  // Degree symbol
-  display.print("C ");
-
-  display.display();
+  String name = currentRadiatorIndex == -1 ? "All" : radiatorManager.getRadiatorName(currentRadiatorIndex);
+  // If anything has changed then it will update the display
+  radiatorDisplay.update(currentRadiatorIndex, name, shownTemp, acked, temp);
 }

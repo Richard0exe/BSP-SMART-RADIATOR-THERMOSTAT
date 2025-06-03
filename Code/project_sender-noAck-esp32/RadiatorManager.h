@@ -34,6 +34,7 @@ public:
   uint8_t getRadiatorTemperature(int index) const;
 
   bool isAcked(int index) const;
+  bool isAllAcked() const;
 private:
   Radiator radiators[MAX_RADIATORS];
   int numRadiators = 0;

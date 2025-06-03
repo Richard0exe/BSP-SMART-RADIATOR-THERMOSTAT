@@ -106,6 +106,14 @@ bool RadiatorManager::isAcked(int index) const {
   return radiators[index].ackReceived;
 }
 
+bool RadiatorManager::isAllAcked() const {
+  for (int i = 0; i < numRadiators; i++) {
+    if (!radiators[i].ackReceived) return false;
+  }
+
+  return true;
+}
+
 int RadiatorManager::findRadiatorIndex(const uint8_t* mac) const {
   for (int i = 0; i < numRadiators; i++) {
     if (memcmp(mac, radiators[i].mac, 6) == 0) {
