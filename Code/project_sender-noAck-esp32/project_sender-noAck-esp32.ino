@@ -115,11 +115,10 @@ void loop() {
   // constantly reading Serial2 waiting for some info
   webComs.update();
 
-  button_state = digitalRead(BUTTON_PIN);
-
   // External button pess logic
+  button_state = digitalRead(BUTTON_PIN);
   if(button_state == LOW && prev_button_state == HIGH){
-    delay(50);
+    delay(50); // maybe there is a nonblocking way to do this?
     buttonClicked = true;
 
     currentRadiatorIndex++;
@@ -141,6 +140,7 @@ void loop() {
 
   prev_button_state = button_state;
 
+  // Encoder button logic
   int encoderButtonState = digitalRead(ENCODER_SW);
   if(encoderButtonState == LOW && lastEncoderButtonState == HIGH){
     encoderClicked = true;
@@ -149,6 +149,7 @@ void loop() {
   }
   lastEncoderButtonState = encoderButtonState;
 
+  // Rotator logic
   int currentState = digitalRead(ENCODER_CLK);
   if(currentState != lastEncoderState && currentState == LOW){
     int delta = (digitalRead(ENCODER_DT) != currentState) ? 1 : -1;
@@ -157,6 +158,7 @@ void loop() {
   }
   lastEncoderState = currentState;
 
+  // Encoder button logic
   if(encoderClicked){
     if (currentRadiatorIndex == -1) {
       // Send to all radiators
