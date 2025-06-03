@@ -4,7 +4,7 @@
 #include <DHT.h>
 #include <DHT_U.h>
 #include <ArduinoJson.h>
-#include "Communications.h"
+#include "Communications.h" 
 #include "Messages.h"
 #include "RadiatorManager.h"
 
@@ -202,14 +202,14 @@ void readFromWebServer() {
 
 
 void loop() {
-// //  constantly reading Serial2 waiting for some info
-//   readFromWebServer();
+//  constantly reading Serial2 waiting for some info
+  readFromWebServer();
 
-// // send some info to webserver every time n period
-//   if((millis() - lastWebSendTime) > sendInterval){
-//     sendRadiatorsToWeb();
-//     lastWebSendTime = millis();
-//   }
+// send some info to webserver every time n period
+  if((millis() - lastWebSendTime) > sendInterval){
+    sendRadiatorsToWeb();
+    lastWebSendTime = millis();
+  }
 
   button_state = digitalRead(BUTTON_PIN);
 
