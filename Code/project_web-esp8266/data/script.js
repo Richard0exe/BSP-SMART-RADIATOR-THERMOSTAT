@@ -130,6 +130,39 @@ window.onload = function() {
     updateTemperatureDisplay();
     renderRadiators();
 
+// === WebSocket Setup ===
+    socket = new WebSocket(`ws://${window.location.host}/ws`);
+
+    socket.onopen = function () {
+        console.log("WebSocket connected");
+    };
+
+socket.onmessage = function (event) {
+    console.log("WebSocket message received:", event.data);
+
+    try {
+        const data = JSON.parse(event.data);
+
+        if (Array.isArray(data)) {
+            // Transform the raw array into your desired format
+            radiators = data.map((r, index) => ({
+                id: index + 1,
+                temp: r.curr_temp,
+                mac: r.mac,
+                name: r.name
+            }));
+
+            renderRadiators();
+        }
+    } catch (err) {
+        console.warn("Invalid JSON from WebSocket:", event.data);
+    }
+};
+
+    socket.onclose = function () {
+        console.log("WebSocket disconnected");
+    };
+
     // Modal setup
 const modal = document.getElementById("addModal");
 const closeBtn = document.querySelector(".close");

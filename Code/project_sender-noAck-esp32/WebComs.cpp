@@ -16,7 +16,12 @@ void WebComs::update() {
   }
 }
 
-void WebComs::handleLine(const String& line) {
+void WebComs::handleLine(const String& lineRaw) {
+  String line = lineRaw;
+  line.trim();  // Removes any \r, spaces, etc.
+  Serial.print("Received command: ");
+  Serial.println(line);
+
   if (line.startsWith("ALL/T")) {
     int temp = line.substring(5).toInt(); // Extract "23" from "ALL/T23"
     _manager.sendTemperatureToAll(temp);

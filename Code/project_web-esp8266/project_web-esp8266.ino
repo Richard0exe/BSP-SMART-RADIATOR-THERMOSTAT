@@ -48,8 +48,10 @@ void setup() {
 
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
-  if (WiFi.waitForConnectResult() != WL_CONNECTED) {
-    Serial.println("WiFi Failed!");
+  int result = WiFi.waitForConnectResult();
+  if (result != WL_CONNECTED) {
+    Serial.print("WiFi Failed! Status: ");
+    Serial.println(result);  // numeric reason
     return;
   }
 
@@ -112,6 +114,7 @@ void setup() {
   ws.onEvent([](AsyncWebSocket *server, AsyncWebSocketClient *client, 
   AwsEventType type, void *arg, uint8_t *data, size_t len) {
   if (type == WS_EVT_CONNECT) {
+    communicationSerial.println("GET/RADIATORS");
     Serial.println("WebSocket client connected");
   } else if (type == WS_EVT_DISCONNECT) {
     Serial.println("WebSocket client disconnected");
@@ -121,21 +124,28 @@ void setup() {
 }
 
 String incomingJSON = "";
-//send unchanged json to web
-void sendToWeb(String jsonStr) {
-  ws.textAll(jsonStr);
-}
 
-void loop() {
-  // listen communicationSerial for incoming messages from ESP32, radiator lists updates and some other info (battery maybe)
+void handleSerialInput() {
     while (communicationSerial.available()) {
     char c = communicationSerial.read();
+    //Serial.print(c);
     if (c == '\n') {
-      // End of JSON line
+      //Serial.println();
       sendToWeb(incomingJSON);
       incomingJSON = "";
     } else {
       incomingJSON += c;
     }
   }
+}
+
+//send unchanged json to web
+void sendToWeb(String jsonStr) {
+  Serial.println(jsonStr);
+  ws.textAll(jsonStr);
+}
+
+void loop() {
+  // listen communicationSerial for incoming messages from ESP32, radiator lists updates and some other info (battery maybe)
+  handleSerialInput();
 }
