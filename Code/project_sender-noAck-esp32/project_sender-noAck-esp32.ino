@@ -8,6 +8,7 @@
 #include "Messages.h"
 #include "RadiatorManager.h"
 #include "RadiatorDisplay.h"
+#include "WebComs.h"
 
 #define DEBUG FALSE // CHANGE TO TRUE TO ENABLE SERIAL OUTPUTS 
 
@@ -35,6 +36,7 @@ DHT dht(DHT_PIN, DHT_TYPE);
 Communications coms;
 RadiatorManager radiatorManager(coms);
 RadiatorDisplay radiatorDisplay(display);
+WebComs webComs(Serial2, radiatorManager);
 
 void OnDataRecv(const uint8_t* mac, uint8_t type, const uint8_t* data, int len){
   switch (type) {
@@ -93,98 +95,25 @@ void setup() {
   coms.broadcastDiscovery();
 }
 
-void sendRadiatorsToWeb(){
-  const Radiator* radiators = radiatorManager.getRadiators();
-  StaticJsonDocument<768> doc;
-  JsonArray arr = doc.to<JsonArray>();
-
-  for (int i = 0; i < radiatorManager.getNumRadiators(); i++) {
-    JsonObject obj = arr.createNestedObject();
-
-    char macStr[18];
-    //make desired mac string using sprintf
-    sprintf(macStr, "%02X:%02X:%02X:%02X:%02X:%02X",
-            radiators[i].mac[0], radiators[i].mac[1], radiators[i].mac[2],
-            radiators[i].mac[3], radiators[i].mac[4], radiators[i].mac[5]);
-    
-    obj["mac"] = macStr;
-    obj["name"] = radiators[i].name;
-    obj["curr_temp"] = radiators[i].curr_temp;
-    obj["ack"] = radiators[i].ackReceived;
-  }
-
-  Serial.println("Sending radiators JSON");
-  serializeJson(doc, Serial2);  // Or to SoftwareSerial
-  Serial2.println(); // newline to indicate end
-}
-
-//process received json and update the radiators struct array
-void processJSON(String jsonStr){
-
-}
-
-static uint8_t lastSentTemperature = 0;
-static unsigned long lastSendTime = 0;
-static unsigned long lastWebSendTime = 0;
-const uint16_t sendInterval = 10000; // 10 seconds delay
-
+//-- Radiator selection satate
+int currentRadiatorIndex = -1; // -1 - all, 0-n - all radiators in radiators array
 uint8_t commonTemp = DEFAULT_TEMP;
 uint8_t rotatorTemp = commonTemp;
 uint8_t shownTemp = rotatorTemp;
 bool tempChanged = false;
 
+//-- Button and encoder states
 int prev_button_state = HIGH;
 int button_state;
-
-// -1 - all, 0-n - all radiators in radiators array
-int currentRadiatorIndex = -1;
+bool buttonClicked = false;
 
 int lastEncoderButtonState = HIGH;
 int lastEncoderState = HIGH;
 int encoderClicked = false;
 
-bool buttonClicked = false;
-
-String readSerial2Line() {
-  static String buffer = "";
-  while (Serial2.available()) {
-    char c = Serial2.read();
-    if (c == '\n') {
-      String line = buffer;
-      buffer = "";
-      return line;
-    } else {
-      buffer += c;
-    }
-  }
-  return "";  // Nothing complete yet
-}
-
-
-void readFromWebServer() {
-  String incoming = readSerial2Line();
-  if (incoming.length() > 0) {
-    Serial.print("Received from WEB: ");
-    Serial.println(incoming);
-
-    // Handle command
-    if (incoming.startsWith("ALL/T")) {
-      String tempStr = incoming.substring(5); // Extract "23" from "ALL/T23"
-      radiatorManager.sendTemperatureToAll(tempStr.toInt());
-    }
-  }
-}
-
-
 void loop() {
   // constantly reading Serial2 waiting for some info
-  readFromWebServer();
-
-  // send some info to webserver every time n period
-  if((millis() - lastWebSendTime) > sendInterval){
-    sendRadiatorsToWeb();
-    lastWebSendTime = millis();
-  }
+  webComs.update();
 
   button_state = digitalRead(BUTTON_PIN);
 
