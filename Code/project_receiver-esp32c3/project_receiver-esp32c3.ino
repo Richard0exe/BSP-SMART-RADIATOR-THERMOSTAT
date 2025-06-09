@@ -1,10 +1,11 @@
 #include <AccelStepper.h>
 #include "Communications.h"
 #include "Messages.h"
+#include <Preferences.h>
 
 #define DEBUG FALSE // CHANGE TO TRUE TO ENABLE SERIAL OUTPUTS 
 #define ESPNOW_CHANNEL 6
-#define STEPS_PER_REVOLUTION 2048
+#define STEPS_PER_REVOLUTION 26000
 
 #define IN1 5 // D5
 #define IN2 4 // D1
@@ -16,6 +17,7 @@ const int stepsPerRevolution = STEPS_PER_REVOLUTION; // For 28BYJ-48 motor
 AccelStepper stepper(AccelStepper::HALF4WIRE, IN1, IN3, IN2, IN4);
 
 Communications coms;
+Preferences preferences;
 
 // Callback function that wilal be executed when data is received
 void OnDataRecv(const uint8_t* mac, uint8_t type, const uint8_t* data, int len) {
@@ -52,9 +54,12 @@ void ProcessTemperatureCommand(const uint8_t* mac, const TemperatureCommand& pay
   else segment = 6;
 
   int targetStep = map(segment, 0, 6, 0, stepsPerRevolution);
-  stepper.moveTo(2 * targetStep);
+  stepper.moveTo(targetStep);
   Serial.print("Moving to step: ");
   Serial.println(targetStep);
+  preferences.begin("motorPos", false);
+  preferences.putLong("lastPos", stepper.targetPosition());
+  preferences.end();
 
   // send ack
   sendAckTemperatureResponse(mac, payload, true);
@@ -114,7 +119,16 @@ void setup() {
 
   // Setup the stepper motor
   stepper.setMaxSpeed(1000);
-  stepper.setAcceleration(500);
+  stepper.setAcceleration(800);
+
+  //setup the saving motor readings
+  Serial.println("Loading last position");
+  preferences.begin("motorPos", true);
+  long savedPos = preferences.getLong("lastPos",0);
+  preferences.end();
+
+  stepper.setCurrentPosition(savedPos);
+  stepper.moveTo(savedPos);
 
   // Loops broadcastDiscovery until server is found
   discoverServer();
