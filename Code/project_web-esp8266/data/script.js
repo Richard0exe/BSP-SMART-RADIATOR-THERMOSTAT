@@ -3,10 +3,12 @@ let minTemp = 8;
 let maxTemp = 28;
 
 let radiators = [
-{ id: 1, temp: 20, mac:"8C:4F:00:42:02:25", name: "Radiator 1" },
+{ id: 1, temp: 20, mac:"8C:4F:00:42:02:25", name: "Radiator 1", schedule: [{startTime: 700, endTime: 1200, temp: 23}, {startTime: 1400, endTime: 1700, temp: 21}, {startTime: 2100, endTime: 600, temp: 18},] },
 { id: 2, temp: 20, mac:"8F:4F:00:42:02:28", name: "Radiator 2" },
 { id: 3, temp: 20, mac:"6C:4F:00:42:02:21", name: "Radiator 3" }
 ];
+
+let currentSchedule = [];
 
 let editModeId = null; // null = adding, number = editing
 
@@ -52,43 +54,25 @@ function sendTemperature(){
     });
     //need to make that sends to all radiators also
 }
-function renderRadiators(filteredRadiators = radiators){
+function renderRadiators(filteredRadiators = radiators) {
     const table = document.querySelector(".radiators-list");
 
+    // Clear previous rows (keep the first 2 rows: header and column names)
     table.querySelectorAll("tr:nth-child(n+3)").forEach(row => row.remove());
 
-    // Add each radiator row
+    const template = document.getElementById("radiator-row-template");
+
     filteredRadiators.forEach(radiator => {
-    const row = document.createElement("tr");
+        const row = template.content.cloneNode(true);
 
-    const nameCell = document.createElement("td");
-    nameCell.textContent = radiator.name;
-    nameCell.classList.add("name-cell");
+        row.querySelector(".name-cell").textContent = radiator.name;
+        row.querySelector(".mac-cell").textContent = radiator.mac;
+        row.querySelector(".temp-cell").textContent = radiator.temp + "°C";
 
-    const tempCell = document.createElement("td");
-    tempCell.textContent = radiator.temp + "°C";
-    tempCell.classList.add("temp-cell");
-    
-    const macCell = document.createElement("td");
-    macCell.textContent = radiator.mac;
-    macCell.classList.add("mac-cell"); // Add the mac-cell class here
+        row.querySelector(".edit-button").onclick = () => editRadiator(radiator.id);
 
-    const controlCell = document.createElement("td");
-    controlCell.innerHTML = `
-        <button onclick="editRadiator(${radiator.id})" title="Edit">
-            <img src="edit.svg" alt="Edit" width="28" height="28">
-        </button>
-        <button onclick="deleteRadiator(${radiator.id})" title="Delete">
-            <img src="delete.svg" alt="Delete" width="28" height="28">
-        </button>
-    `;
-
-    row.appendChild(nameCell);
-    row.appendChild(macCell);
-    row.appendChild(tempCell);
-    row.appendChild(controlCell);
-    table.appendChild(row);
-});
+        table.appendChild(row);
+    });
 }
 
 function deleteRadiator(id) {
@@ -110,8 +94,9 @@ function editRadiator(id) {
         document.getElementById("newMac").value = radiator.mac;
         document.getElementById("newTemperature").value = radiator.temp;
         document.querySelector("#addModal h2").textContent = "Edit Radiator";
-        document.getElementById("modal-add").textContent = "Edit";
+        document.getElementById("modal-add").textContent = "Save";
         document.getElementById("addModal").style.display = "block";
+        renderSchedule(radiator.schedule);
     }
 }
 
@@ -241,3 +226,25 @@ window.onclick = function (event) {
     }
 };
 };
+
+// Schedule
+function renderSchedule(schedule) {
+    const list = document.querySelector(".radiators-list");
+
+    // Clear previous rows (keep the first 2 rows: header and column names)
+    table.querySelectorAll("tr:nth-child(n+3)").forEach(row => row.remove());
+
+    const template = document.getElementById("radiator-row-template");
+
+    filteredRadiators.forEach(radiator => {
+        const row = template.content.cloneNode(true);
+
+        row.querySelector(".name-cell").textContent = radiator.name;
+        row.querySelector(".mac-cell").textContent = radiator.mac;
+        row.querySelector(".temp-cell").textContent = radiator.temp + "°C";
+
+        row.querySelector(".edit-button").onclick = () => editRadiator(radiator.id);
+
+        table.appendChild(row);
+    });
+}
