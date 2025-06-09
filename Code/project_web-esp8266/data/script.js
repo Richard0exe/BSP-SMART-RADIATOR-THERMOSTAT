@@ -3,12 +3,10 @@ let minTemp = 8;
 let maxTemp = 28;
 
 let radiators = [
-{ id: 1, temp: 20, mac:"8C:4F:00:42:02:25", name: "Radiator 1", schedule: [{startTime: 700, endTime: 1200, temp: 23}, {startTime: 1400, endTime: 1700, temp: 21}, {startTime: 2100, endTime: 600, temp: 18},] },
+{ id: 1, temp: 20, mac:"8C:4F:00:42:02:25", name: "Radiator 1" },
 { id: 2, temp: 20, mac:"8F:4F:00:42:02:28", name: "Radiator 2" },
 { id: 3, temp: 20, mac:"6C:4F:00:42:02:21", name: "Radiator 3" }
 ];
-
-let currentSchedule = [];
 
 let editModeId = null; // null = adding, number = editing
 
@@ -96,7 +94,6 @@ function editRadiator(id) {
         document.querySelector("#addModal h2").textContent = "Edit Radiator";
         document.getElementById("modal-add").textContent = "Save";
         document.getElementById("addModal").style.display = "block";
-        renderSchedule(radiator.schedule);
     }
 }
 
@@ -226,25 +223,3 @@ window.onclick = function (event) {
     }
 };
 };
-
-// Schedule
-function renderSchedule(schedule) {
-    const list = document.querySelector(".radiators-list");
-
-    // Clear previous rows (keep the first 2 rows: header and column names)
-    table.querySelectorAll("tr:nth-child(n+3)").forEach(row => row.remove());
-
-    const template = document.getElementById("radiator-row-template");
-
-    filteredRadiators.forEach(radiator => {
-        const row = template.content.cloneNode(true);
-
-        row.querySelector(".name-cell").textContent = radiator.name;
-        row.querySelector(".mac-cell").textContent = radiator.mac;
-        row.querySelector(".temp-cell").textContent = radiator.temp + "°C";
-
-        row.querySelector(".edit-button").onclick = () => editRadiator(radiator.id);
-
-        table.appendChild(row);
-    });
-}

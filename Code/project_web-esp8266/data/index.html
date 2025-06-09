@@ -67,30 +67,6 @@
                 <p id="input-title">Temperature</p>
                 <input type="number" min="8" max="28" id="newTemperature" placeholder="Enter temperature">
             </div>
-            <div class="schedule-editor">
-                <h3>Schedule</h3>
-
-                <table id="scheduleList" class="schedule-table">
-                    <thead>
-                        <tr>
-                            <th>Start Time</th>
-                            <th>End Time</th>
-                            <th>Temperature (°C)</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <!-- Schedule rows will be added here dynamically -->
-                    </tbody>
-                </table>
-
-                <div class="schedule-inputs" style="margin-top: 10px;">
-                    <input type="time" id="scheduleStartTime">
-                    <input type="time" id="scheduleEndTime">
-                    <input type="number" min="8" max="28" id="scheduleTemperature" placeholder="Temp °C">
-                    <button type="button" id="addScheduleItem">Add schedule</button>
-                </div>
-            </div>
             <div class="modal-buttons">
                 <button id="modal-close" onclick="closeModal()">Close</button>
                 <button id="modal-add" onclick="submitNewRadiator()">Add</button>
