@@ -39,16 +39,19 @@ void RadiatorDisplay::update(int radiatorIndex, const String& name, uint8_t show
     return; // No change
   }
 
-  lastRadiatorIndex = radiatorIndex;
   lastName = name;
   lastShownTemp = shownTemp;
   lastAck = ackReceived;
   lastDhtTemp = dhtTemp;
 
-  render(radiatorIndex, name, shownTemp, ackReceived, dhtTemp);
+  render(name, shownTemp, ackReceived, dhtTemp);
 }
 
-void RadiatorDisplay::render(int radiatorIndex, const String& name, uint8_t shownTemp, bool ackReceived, float dhtTemp) {
+void RadiatorDisplay::redraw() {
+  render(lastName, lastShownTemp, lastAck, lastDhtTemp);
+}
+
+void RadiatorDisplay::render(const String& name, uint8_t shownTemp, bool ackReceived, float dhtTemp) {
   display.clearDisplay();
 
   drawAckIcon(ackReceived);

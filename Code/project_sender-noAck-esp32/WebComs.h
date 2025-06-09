@@ -5,6 +5,10 @@
 
 class WebComs {
 public:
+    String ssid;
+    String password;
+    String ip;
+
     WebComs(HardwareSerial& serial, RadiatorManager& manager);
     void update();
 
@@ -15,6 +19,7 @@ private:
 
     void handleLine(const String& line);
     void sendRadiatorStates();
+    int splitString(const String& str, char delimiter, String* parts, int maxParts);
 };
 
 

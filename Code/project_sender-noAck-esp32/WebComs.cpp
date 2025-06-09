@@ -22,11 +22,21 @@ void WebComs::handleLine(const String& lineRaw) {
   Serial.print("Received command: ");
   Serial.println(line);
 
-  if (line.startsWith("ALL/T")) {
-    int temp = line.substring(5).toInt(); // Extract "23" from "ALL/T23"
-    _manager.sendTemperatureToAll(temp);
-  } else if (line == "GET/RADIATORS") {
-    sendRadiatorStates();
+  const int MAX_PARTS = 5;
+  String parts[MAX_PARTS];
+  int numParts = splitString(line, '/', parts, MAX_PARTS);
+
+  if (numParts == 0) return; // nothing to do
+
+  if (parts[0] == "ALL" && parts[1] == "T" && numParts >= 3) {
+      int temp = parts[2].toInt();
+      _manager.sendTemperatureToAll(temp);
+  } else if (parts[0] == "GET" && parts[1] == "RADIATORS") {
+      sendRadiatorStates();
+  } else if (parts[0] == "INFO") {
+    ip = parts[1];
+    ssid = parts[2];
+    password = parts[3];
   }
 
   // other possible commands
@@ -59,4 +69,23 @@ void WebComs::sendRadiatorStates() {
   Serial.println("Sending radiators JSON");
   serializeJson(doc, _serial);  // Or to SoftwareSerial
   _serial.println(); // newline to indicate end
+}
+
+int WebComs::splitString(const String& str, char delimiter, String* parts, int maxParts) {
+    int partCount = 0;
+    int start = 0;
+    int end = str.indexOf(delimiter);
+
+    while (end != -1 && partCount < maxParts - 1) {
+        parts[partCount++] = str.substring(start, end);
+        start = end + 1;
+        end = str.indexOf(delimiter, start);
+    }
+
+    // Add the last part
+    if (partCount < maxParts) {
+        parts[partCount++] = str.substring(start);
+    }
+
+    return partCount;
 }

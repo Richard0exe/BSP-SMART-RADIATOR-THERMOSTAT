@@ -9,6 +9,7 @@ public:
 
   void begin();
   void update(int radiatorIndex, const String& name, uint8_t shownTemp, bool ackReceived, float dhtTemp);
+  void redraw();
 
 private:
   Adafruit_SSD1306& display;
@@ -20,7 +21,7 @@ private:
   bool lastAck = false;
   float lastDhtTemp = -1000.0; // Definitely out of range
 
-  void render(int radiatorIndex, const String& name, uint8_t shownTemp, bool ackReceived, float dhtTemp);
+  void render(const String& name, uint8_t shownTemp, bool ackReceived, float dhtTemp);
   void drawAckIcon(bool ackReceived);
   void drawRadiatorName(const String& name);
   void drawShownTemp(uint8_t temp);

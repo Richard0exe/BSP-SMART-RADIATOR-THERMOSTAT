@@ -36,10 +36,23 @@ void sendTemperature(String temperature) {
     Serial.print("Set temperature to: ");
     Serial.println(temp);
     //Sending flag to set temperature to all
-    communicationSerial.print("ALL/T");
+    communicationSerial.print("ALL/T/");
     communicationSerial.println(temp);
   }
 }
+
+void sendInfo() {
+  String IP = WiFi.softAPIP().toString();
+
+  communicationSerial.print("INFO/");
+  communicationSerial.print(IP);
+  communicationSerial.print("/");
+  communicationSerial.print(ssid);
+  communicationSerial.print("/");
+  communicationSerial.print(password);
+  communicationSerial.println();
+}
+
 
 void setup() {
   Serial.begin(115200);
@@ -117,6 +130,8 @@ void setup() {
   }
   });
   server.addHandler(&ws);
+
+  sendInfo(); // send IP, ssid, password to esp-server
 }
 
 String incomingJSON = "";
