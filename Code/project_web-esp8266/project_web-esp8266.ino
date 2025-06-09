@@ -10,8 +10,8 @@
 
 SoftwareSerial communicationSerial(RX, TX);
 
-const char *ssid = "LMT-F3DD";
-const char *password = "QN5QQTY6J16";
+const char *ssid = "ESP32-Access-Point";
+const char *password = "123456789";
 
 typedef struct { 
   uint8_t mac[6];
@@ -46,18 +46,14 @@ void setup() {
 
   communicationSerial.begin(9600);
 
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid, password);
-  int result = WiFi.waitForConnectResult();
-  if (result != WL_CONNECTED) {
-    Serial.print("WiFi Failed! Status: ");
-    Serial.println(result);  // numeric reason
-    return;
-  }
+  WiFi.mode(WIFI_AP);
+  WiFi.softAP(ssid, password);
 
   Serial.println();
-  Serial.print("IP Address: ");
-  Serial.println(WiFi.localIP());
+
+  IPAddress IP = WiFi.softAPIP();
+  Serial.print("AP IP address: ");
+  Serial.println(IP);
 
   Serial.println("Starting LittleFS!");
   if (!LittleFS.begin()) {
@@ -126,7 +122,7 @@ void setup() {
 String incomingJSON = "";
 
 void handleSerialInput() {
-    while (communicationSerial.available()) {
+  while (communicationSerial.available()) {
     char c = communicationSerial.read();
     //Serial.print(c);
     if (c == '\n') {
