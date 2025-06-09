@@ -35,6 +35,7 @@ function setTemperatureFromInput() {
         document.getElementById('temp').value = temperature + '°C';
     }
 }
+
 function sendTemperature(){
     alert(`Temperature ${temperature}°C sent!`)
     radiators.forEach(radiator => {
@@ -42,7 +43,7 @@ function sendTemperature(){
         
     });
     renderRadiators();
-    fetch(`/set?temperature=${temperature}`)
+    fetch(`/set/all?temperature=${temperature}`)
     .then(response => response.text())  // Read the response body as text
     .then(data => {
         console.log("Response:", data);  // Log the actual response content
@@ -50,8 +51,19 @@ function sendTemperature(){
     .catch(error => {
         console.error("Error:", error);  // Log any errors that occur
     });
-    //need to make that sends to all radiators also
 }
+
+function sendTemperatureToRadiator(radiatorId, temp) {
+    fetch(`/set/temp?id=${radiatorId}&temp=${temp}`)
+    .then(response => response.text())
+    .then(data => {
+        console.log(`Response for radiator ${radiatorId}:`, data);
+    })
+    .catch(error => {
+        console.error(`Error sending to radiator ${radiatorId}:`, error);
+    });
+}
+
 function renderRadiators(filteredRadiators = radiators) {
     const table = document.querySelector(".radiators-list");
 
@@ -97,13 +109,35 @@ function editRadiator(id) {
     }
 }
 
-function synchronize(){
-    const message = radiators.map(r => 
-    `Name: ${r.name}\nMAC: ${r.mac}\nTemp: ${r.temp}°C`
-    ).join('\n\n');
-    alert(`Synchronizing with Microcontroller...\n\n${message}`);
-    //fetch info from radiators
+function disableSyncButton() {
+    const syncButton = document.getElementById("sync-button");
+    syncButton.disabled = true;  // Disable button
+    syncButton.textContent = "Synchronizing...";
 }
+
+function enableSyncButton() {
+    const syncButton = document.getElementById("sync-button");
+    syncButton.disabled = false;
+    syncButton.textContent = "Synchronize";
+}
+
+function synchronize() {
+    disableSyncButton();
+    console.log("Starting synchronization...");
+
+    fetch("/sync")
+        .then(response => response.text())
+        .then(data => {
+            console.log("Sync request sent:", data);
+        })
+        .catch(error => {
+            console.error("Error sending sync command:", error);
+            syncButton.disabled = false;
+            syncButton.textContent = "Synchronize";
+        });
+}
+
+
 function closeModal() {
     document.getElementById("modal-add").textContent = "Add";
     document.getElementById("addModal").style.display = "none";
@@ -128,12 +162,13 @@ socket.onmessage = function (event) {
         if (Array.isArray(data)) {
             // Transform the raw array into your desired format
             radiators = data.map((r, index) => ({
-                id: index + 1,
+                id: index,
                 temp: r.curr_temp,
                 mac: r.mac,
                 name: r.name
             }));
 
+            enableSyncButton();
             renderRadiators();
         }
     } catch (err) {
@@ -196,6 +231,7 @@ window.submitNewRadiator = function () {
             radiator.mac = newMAC;
             radiator.temp = newTemperature;
         }
+        sendTemperatureToRadiator(radiator.id, radiator.temp);
     } else {
         // Add new radiator
         const newId = radiators.length ? Math.max(...radiators.map(r => r.id)) + 1 : 1;

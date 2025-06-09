@@ -41,6 +41,22 @@ void sendTemperature(String temperature) {
   }
 }
 
+void sendTemperatureTo(String index, String temperature) {
+    int temp = temperature.toInt();
+    
+    if (temp >= 8 && temp <= 28) {
+        Serial.print("Set temperature to: ");
+        Serial.print(temp);
+        Serial.print(" for index: ");
+        Serial.println(index);
+
+        communicationSerial.print("SET/TEMP/");
+        communicationSerial.print(index);
+        communicationSerial.print("/");
+        communicationSerial.println(temp);
+    }
+}
+
 void sendInfo() {
   String IP = WiFi.softAPIP().toString();
 
@@ -102,7 +118,7 @@ void setup() {
     request->send(LittleFS, "/delete.svg", "image/svg+xml");
   });
 
-  server.on("/set", HTTP_GET, [](AsyncWebServerRequest *request) {
+  server.on("/set/all", HTTP_GET, [](AsyncWebServerRequest *request) {
     String temperature;
     if (request->hasParam(PARAM_MESSAGE)) {
       temperature = request->getParam(PARAM_MESSAGE)->value();
@@ -115,6 +131,33 @@ void setup() {
       temperature = "No message sent";
     }
     request->send(200, "text/plain", "Received temperature: " + temperature);
+  });
+
+  server.on("/set/temp", HTTP_GET, [](AsyncWebServerRequest *request) {
+      String id;
+      String temperature;
+
+      if (request->hasParam("id") && request->hasParam("temp")) {
+          id = request->getParam("id")->value();
+          temperature = request->getParam("temp")->value();
+
+          Serial.print("Received temperature for ID ");
+          Serial.print(id);
+          Serial.print(": ");
+          Serial.println(temperature);
+
+          // Call your function here:
+          sendTemperatureTo(id, temperature);
+
+          request->send(200, "text/plain", "Set temp for ID " + id + " to " + temperature);
+      } else {
+          request->send(400, "text/plain", "Missing id or temp parameter");
+      }
+  });
+
+  server.on("/sync", HTTP_GET, [](AsyncWebServerRequest *request) {
+    communicationSerial.println("GET/RADIATORS");
+    request->send(200, "text/plain", "Sync command sent");
   });
 
   server.onNotFound(notFound);

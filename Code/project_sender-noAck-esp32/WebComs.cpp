@@ -37,6 +37,13 @@ void WebComs::handleLine(const String& lineRaw) {
     ip = parts[1];
     ssid = parts[2];
     password = parts[3];
+  } else if (parts[0] == "SET") {
+    if (parts[1] == "TEMP") { // SET/TEMP/<id>/<temperature>
+      int index = parts[2].toInt();
+      int temp = parts[3].toInt();
+      Serial.printf("Setting temperature to [%d]: %d°C\n", index, temp);
+      _manager.sendTemperatureTo(index, temp);
+    }
   }
 
   // other possible commands
