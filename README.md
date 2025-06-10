@@ -55,8 +55,11 @@ ARDUINO IDE -> (CMD + SHIFT + P) -> UPLOAD LittleFS to...
 ---
 
 #### Web Interface
-Once the system is up and running, connect your device to the same network as the ESP32. Access the web interface by entering the ESP32's IP address in a web browser. Use the interface to adjust the radiator temperatures remotely.
+Once the system is up and running, connect your device to the same network as the ESP8266. Access the web interface by entering the ESP8266's IP address in a web browser. Use the interface to adjust the radiator temperatures remotely.
 The IP address to access the server is being printed to serial port.
+
+⚠️ **IMPORTANT!** ⚠️
+To find the IP address and other information press the info button
 
 #### Manual Control
 Rotate the rotary encoder to adjust the desired temperature for the selected radiator. The OLED display will show the current temperature and the selected radiator. Use the button to switch between different radiators.
